@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>com.helisa</groupId>
 	<artifactId>docmanager</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>0.0.1</version>
 	<name>docmanager</name>
 	<description>Gestor Documental </description>
 	<url/>
@@ -57,6 +57,10 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
 		</dependency>
 	</dependencies>
 
