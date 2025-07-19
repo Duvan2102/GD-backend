@@ -19,11 +19,6 @@ public class UsuarioController {
     @Autowired
     private UsuarioService usuarioService;
 
-    /**
-     * Crear un nuevo usuario
-     * @param usuario Usuario a crear
-     * @return ResponseEntity con el usuario creado
-     */
     @PostMapping
     public ResponseEntity<?> crearUsuario(@Valid @RequestBody Usuario usuario) {
         try {
@@ -38,10 +33,6 @@ public class UsuarioController {
         }
     }
 
-    /**
-     * Obtener todos los usuarios
-     * @return ResponseEntity con la lista de usuarios
-     */
     @GetMapping
     public ResponseEntity<List<Usuario>> obtenerTodosUsuarios() {
         try {
@@ -52,11 +43,6 @@ public class UsuarioController {
         }
     }
 
-    /**
-     * Obtener usuario por ID
-     * @param id ID del usuario
-     * @return ResponseEntity con el usuario encontrado
-     */
     @GetMapping("/{id}")
     public ResponseEntity<?> obtenerUsuarioPorId(@PathVariable Integer id) {
         try {
@@ -73,11 +59,6 @@ public class UsuarioController {
         }
     }
 
-    /**
-     * Obtener usuario por nombre de usuario
-     * @param usuario Nombre de usuario
-     * @return ResponseEntity con el usuario encontrado
-     */
     @GetMapping("/usuario/{usuario}")
     public ResponseEntity<?> obtenerUsuarioPorNombreUsuario(@PathVariable String usuario) {
         try {
@@ -94,11 +75,6 @@ public class UsuarioController {
         }
     }
 
-    /**
-     * Obtener usuario por identificación
-     * @param identificacion Identificación del usuario
-     * @return ResponseEntity con el usuario encontrado
-     */
     @GetMapping("/identificacion/{identificacion}")
     public ResponseEntity<?> obtenerUsuarioPorIdentificacion(@PathVariable String identificacion) {
         try {
@@ -115,12 +91,6 @@ public class UsuarioController {
         }
     }
 
-    /**
-     * Actualizar usuario
-     * @param id ID del usuario a actualizar
-     * @param usuario Datos actualizados del usuario
-     * @return ResponseEntity con el usuario actualizado
-     */
     @PutMapping("/{id}")
     public ResponseEntity<?> actualizarUsuario(@PathVariable Integer id, @Valid @RequestBody Usuario usuario) {
         try {
@@ -135,11 +105,6 @@ public class UsuarioController {
         }
     }
 
-    /**
-     * Eliminar usuario por ID
-     * @param id ID del usuario a eliminar
-     * @return ResponseEntity con el resultado de la operación
-     */
     @DeleteMapping("/{id}")
     public ResponseEntity<?> eliminarUsuario(@PathVariable Integer id) {
         try {
@@ -154,11 +119,6 @@ public class UsuarioController {
         }
     }
 
-    /**
-     * Buscar usuarios por nombre o apellido
-     * @param termino Término de búsqueda
-     * @return ResponseEntity con la lista de usuarios encontrados
-     */
     @GetMapping("/buscar")
     public ResponseEntity<List<Usuario>> buscarUsuarios(@RequestParam String termino) {
         try {
@@ -169,11 +129,6 @@ public class UsuarioController {
         }
     }
 
-    /**
-     * Obtener usuarios por cargo
-     * @param cargoId ID del cargo
-     * @return ResponseEntity con la lista de usuarios
-     */
     @GetMapping("/cargo/{cargoId}")
     public ResponseEntity<List<Usuario>> obtenerUsuariosPorCargo(@PathVariable Integer cargoId) {
         try {
@@ -184,7 +139,6 @@ public class UsuarioController {
         }
     }
 
-    // Clases internas para respuestas
     public static class ErrorResponse {
         private String error;
         private String mensaje;
