@@ -2,42 +2,29 @@ name: Build and Deploy JAR (Dev)
 
 on:
   push:
-    branches: [ "Dev" ]  # <- activa el workflow solo con push en Dev
+    branches: [ "Dev" ]
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
-    - name: Checkout del código
-      uses: actions/checkout@v3
+      - name: Checkout del código
+        uses: actions/checkout@v3
 
-    - name: Setup Java
-      uses: actions/setup-java@v3
-      with:
-        distribution: 'temurin'
-        java-version: '21'
-    - name: Set execute permission for mvnw
-      run: chmod +x mvnw
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '21'
 
-    - name: Construir el JAR
-      run: ./mvnw clean package -DskipTests
+      - name: Permitir ejecución de Maven wrapper
+        run: chmod +x mvnw
 
-    - name: Copiar JAR al servidor (entorno Dev)
-      uses: appleboy/scp-action@v0.1.4
-      with:
-        host: ${{ secrets.SERVER_HOST }}
-        username: ${{ secrets.SERVER_USER }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        source: target/docmanager-0.0.1.jar
-        target: /opt/docmanager-dev/
+      - name: Compilar JAR
+        run: ./mvnw clean package -DskipTests
 
-    - name: Reiniciar aplicación remotamente (entorno Dev)
-      uses: appleboy/ssh-action@v0.1.8
-      with:
-        host: ${{ secrets.SERVER_HOST }}
-        username: ${{ secrets.SERVER_USER }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        script: |
-          pkill -f docmanager-0.0.1.jar || true
-          nohup java -jar /opt/docmanager-dev/docmanager-0.0.1-SNAPSHOT.jar > /opt/docmanager-dev/app-dev.log 2>&1 &
+      - name: Ejecutar JAR
+        run: |
+          pkill -f docmanager-0.0.1-SNAPSHOT.jar || true
+          nohup java -jar target/docmanager-0.0.1-SNAPSHOT.jar > app-dev.log 2>&1 &
