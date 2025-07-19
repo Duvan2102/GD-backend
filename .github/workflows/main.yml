@@ -26,5 +26,7 @@ jobs:
 
       - name: Ejecutar JAR
         run: |
+          mkdir -p /opt/apps/
+          cp target/docmanager-0.0.1.jar /opt/apps/
           pkill -f docmanager-0.0.1.jar || true
-          nohup java -jar target/docmanager-0.0.1.jar > app-dev.log 2>&1 &
+          nohup java -jar /opt/apps/docmanager-0.0.1.jar > /opt/apps/app-dev.log 2>&1 &
