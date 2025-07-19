@@ -11,7 +11,7 @@ import java.util.Optional;
 
 @Repository
 public interface DepartamentoRepository extends JpaRepository<Departamento, Integer> {
-    // Buscar departamento por descripción exacta
+
     Optional<Departamento> findByDescripcion(String descripcion);
 
     @Query("SELECT d FROM Departamento d WHERE LOWER(d.descripcion) LIKE LOWER(CONCAT('%', :descripcion, '%'))")
