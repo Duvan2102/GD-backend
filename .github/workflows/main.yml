@@ -2,7 +2,7 @@ name: Build and Deploy JAR (Dev)
 
 on:
   push:
-    branches: [ "Dev" ]
+    branches: [ "pre-prod" ]
 
 jobs:
   build-and-deploy:
