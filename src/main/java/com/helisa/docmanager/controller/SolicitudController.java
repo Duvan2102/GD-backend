@@ -19,8 +19,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @RestController
@@ -33,47 +36,100 @@ public class SolicitudController {
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<SolicitudDetalleResponse> crear(
-            @Valid @ModelAttribute CrearSolicitudRequest request) {
+            @RequestParam("idSolicitante") Integer idSolicitante,
+            @RequestParam("idTipologia") Integer idTipologia,
+            @RequestParam("destinatarios") Integer[] destinatarios,
+            @RequestParam("ordenFirma") Boolean ordenFirma,
+            @RequestParam(value = "comentarioInicial", required = false) String comentarioInicial,
+            @RequestParam(value = "nombreSolicitud", required = true) String nombreSolicitud,
+            @RequestPart("pdfPrincipal") MultipartFile pdfPrincipal,
+            @RequestPart(value = "adjuntos", required = false) MultipartFile[] adjuntos,
+            @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
+
+        log.info("Creando solicitud - CorrelationId: {}, Solicitante: {}", correlationId, idSolicitante);
+
+        CrearSolicitudRequest request = CrearSolicitudRequest.builder()
+                .idSolicitante(idSolicitante)
+                .idTipologia(idTipologia)
+                .destinatarios(destinatarios)
+                .nombreSolicitud(nombreSolicitud)
+                .ordenFirma(ordenFirma)
+                .comentarioInicial(comentarioInicial)
+                .pdfPrincipal(pdfPrincipal)
+                .adjuntos(adjuntos)
+                .build();
 
         SolicitudDetalleResponse response = solicitudService.crear(request);
+
+        log.info("Solicitud creada exitosamente - ID: {}, CorrelationId: {}",
+                response.getId(), correlationId);
+
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<SolicitudDetalleResponse> obtenerDetalle(@PathVariable Integer id) {
+    public ResponseEntity<SolicitudDetalleResponse> obtenerDetalle(
+            @PathVariable Integer id,
+            @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
+
+        log.info("Consultando solicitud - ID: {}, CorrelationId: {}", id, correlationId);
         SolicitudDetalleResponse response = solicitudService.obtenerDetalle(id);
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/{id}/aprobar")
-    public ResponseEntity<Void> aprobar(@PathVariable Integer id,
-                                        @Valid @RequestBody DecisionRequest request) {
+    public ResponseEntity<Void> aprobar(
+            @PathVariable Integer id,
+            @Valid @RequestBody DecisionRequest request,
+            @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
+
+        log.info("Aprobando solicitud - ID: {}, Usuario: {}, CorrelationId: {}",
+                id, request.getUsuarioId(), correlationId);
         solicitudService.aprobar(id, request);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/{id}/rechazar")
-    public ResponseEntity<Void> rechazar(@PathVariable Integer id,
-                                         @Valid @RequestBody DecisionRequest request) {
+    public ResponseEntity<Void> rechazar(
+            @PathVariable Integer id,
+            @Valid @RequestBody DecisionRequest request,
+            @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
+
+        log.info("Rechazando solicitud - ID: {}, Usuario: {}, CorrelationId: {}",
+                id, request.getUsuarioId(), correlationId);
         solicitudService.rechazar(id, request);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/{id}/cancelar")
-    public ResponseEntity<Void> cancelar(@PathVariable Integer id,
-                                         @Valid @RequestBody DecisionRequest request) {
+    public ResponseEntity<Void> cancelar(
+            @PathVariable Integer id,
+            @Valid @RequestBody DecisionRequest request,
+            @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
+
+        log.info("Cancelando solicitud - ID: {}, Usuario: {}, CorrelationId: {}",
+                id, request.getUsuarioId(), correlationId);
         solicitudService.cancelar(id, request);
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("/{id}/pdf")
-    public ResponseEntity<InputStreamResource> streamPdf(@PathVariable Integer id) {
+    public ResponseEntity<InputStreamResource> streamPdf(
+            @PathVariable Integer id,
+            @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
+
         try {
+            log.info("Streaming PDF - Solicitud: {}, CorrelationId: {}", id, correlationId);
+
             InputStream pdfStream = solicitudService.streamPdfPrincipal(id);
             String filename = solicitudService.obtenerNombrePdf(id);
 
+            String encodedFilename = URLEncoder.encode(filename, StandardCharsets.UTF_8)
+                    .replaceAll("\\+", "%20");
+
             return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "inline; filename=\"" + encodedFilename + "\"")
                     .header(HttpHeaders.CONTENT_TYPE, "application/pdf")
                     .header(HttpHeaders.CACHE_CONTROL, "no-store")
                     .body(new InputStreamResource(pdfStream));
@@ -83,23 +139,36 @@ public class SolicitudController {
             throw new RuntimeException("Error al obtener PDF");
         }
     }
-    // Más endpoints según especificación...
+
     @GetMapping("/{id}/adjuntos")
-    public ResponseEntity<List<AdjuntoResponse>> listarAdjuntos(@PathVariable Integer id) {
+    public ResponseEntity<List<AdjuntoResponse>> listarAdjuntos(
+            @PathVariable Integer id,
+            @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
+
+        log.info("Listando adjuntos - Solicitud: {}, CorrelationId: {}", id, correlationId);
         List<AdjuntoResponse> adjuntos = solicitudService.listarAdjuntos(id);
         return ResponseEntity.ok(adjuntos);
     }
 
     @GetMapping("/{id}/adjuntos/{adjuntoId}/download")
     public ResponseEntity<InputStreamResource> descargarAdjunto(
-            @PathVariable Integer id, @PathVariable Integer adjuntoId) {
+            @PathVariable Integer id,
+            @PathVariable Long adjuntoId,  // Long porque SolicitudAdjunto usa Long como ID
+            @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
 
         try {
+            log.info("Descargando adjunto - Solicitud: {}, Adjunto: {}, CorrelationId: {}",
+                    id, adjuntoId, correlationId);
+
             InputStream adjuntoStream = solicitudService.descargarAdjunto(id, adjuntoId);
             String filename = solicitudService.obtenerNombreAdjunto(adjuntoId);
 
+            String encodedFilename = URLEncoder.encode(filename, StandardCharsets.UTF_8)
+                    .replaceAll("\\+", "%20");
+
             return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"" + encodedFilename + "\"")
                     .header(HttpHeaders.CACHE_CONTROL, "no-store")
                     .body(new InputStreamResource(adjuntoStream));
 
@@ -109,12 +178,17 @@ public class SolicitudController {
         }
     }
 
-    // Endpoints de listado
+    // =============== ENDPOINTS DE LISTADO ===============
+
     @GetMapping
     public ResponseEntity<Page<SolicitudResumenResponse>> listarPorCreador(
             @RequestParam Integer creadorId,
             @RequestParam(required = false) String estado,
-            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
+            @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
+
+        log.info("Listando solicitudes por creador - Creador: {}, Estado: {}, CorrelationId: {}",
+                creadorId, estado, correlationId);
 
         Page<SolicitudResumenResponse> solicitudes =
                 solicitudService.listarPorCreador(creadorId, estado, pageable);
@@ -123,8 +197,12 @@ public class SolicitudController {
 
     @GetMapping("/para-gestionar")
     public ResponseEntity<Page<SolicitudResumenResponse>> listarParaGestionar(
-            @RequestParam Long usuarioId,
-            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.ASC) Pageable pageable) {
+            @RequestParam Integer usuarioId,  // Corregido a Integer
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.ASC) Pageable pageable,
+            @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
+
+        log.info("Listando solicitudes para gestionar - Usuario: {}, CorrelationId: {}",
+                usuarioId, correlationId);
 
         Page<SolicitudResumenResponse> solicitudes =
                 solicitudService.listarParaGestionar(usuarioId, pageable);
@@ -133,8 +211,11 @@ public class SolicitudController {
 
     @GetMapping("/historico")
     public ResponseEntity<Page<SolicitudResumenResponse>> listarHistorico(
-            @RequestParam Long usuarioId,
-            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+            @RequestParam Integer usuarioId,  // Corregido a Integer
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
+            @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
+
+        log.info("Listando histórico - Usuario: {}, CorrelationId: {}", usuarioId, correlationId);
 
         Page<SolicitudResumenResponse> solicitudes =
                 solicitudService.listarHistorico(usuarioId, pageable);
@@ -143,9 +224,13 @@ public class SolicitudController {
 
     @GetMapping("/finalizadas")
     public ResponseEntity<Page<SolicitudResumenResponse>> listarFinalizadas(
-            @RequestParam Long tipologiaId,
+            @RequestParam Integer tipologiaId,
             @RequestParam(defaultValue = "APROBADO") String estado,
-            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
+            @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
+
+        log.info("Listando finalizadas - Tipología: {}, Estado: {}, CorrelationId: {}",
+                tipologiaId, estado, correlationId);
 
         Page<SolicitudResumenResponse> solicitudes =
                 solicitudService.listarFinalizadas(tipologiaId, estado, pageable);

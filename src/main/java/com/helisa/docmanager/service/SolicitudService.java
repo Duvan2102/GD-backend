@@ -5,13 +5,9 @@ import com.helisa.docmanager.dto.response.DestinatarioResponse;
 import com.helisa.docmanager.dto.response.SolicitudDetalleResponse;
 import com.helisa.docmanager.dto.response.SolicitudResumenResponse;
 import com.helisa.docmanager.model.*;
-import com.helisa.docmanager.repository.SolicitudAdjuntoRepository;
-import com.helisa.docmanager.repository.SolicitudDestinatarioRepository;
-import com.helisa.docmanager.repository.SolicitudHistorialRepository;
-import com.helisa.docmanager.repository.SolicitudRepository;
+import com.helisa.docmanager.repository.*;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.io.FilenameUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -22,6 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -33,11 +30,18 @@ public class SolicitudService {
 
     @Autowired
     private SolicitudRepository solicitudRepository;
-    @Autowired private SolicitudDestinatarioRepository destinatarioRepository;
-    @Autowired private SolicitudAdjuntoRepository adjuntoRepository;
-    @Autowired private SolicitudHistorialRepository historialRepository;
-    @Autowired private StorageService storageService;
-    @Autowired private FlujoAprobacionService flujoService;
+    @Autowired
+    private SolicitudDestinatarioRepository destinatarioRepository;
+    @Autowired
+    private SolicitudAdjuntoRepository adjuntoRepository;
+    @Autowired
+    private SolicitudHistorialRepository historialRepository;
+    @Autowired
+    private StorageService storageService;
+    @Autowired
+    private FlujoAprobacionService flujoService;
+    @Autowired
+    private EstadoRepository estadoRepository;
 
     @Value("${storage.max-pdf-bytes:52428800}")
     private long maxPdfBytes;
@@ -56,21 +60,36 @@ public class SolicitudService {
                 validarAdjuntos(request.getAdjuntos());
             }
 
+            // Obtener el estado PENDIENTE de la BD
+            Estado estadoPendiente = estadoRepository.getEstadoPendiente();
+
             // Crear solicitud
             Solicitud solicitud = new Solicitud();
-            solicitud.setIdSolicitante(request.getIdSolicitante()); // Integer
-            solicitud.setTipologiaId(request.getIdTipologia());
-            solicitud.setOrdenFirma(request.getOrdenFirma());
-            solicitud.setEstado(Solicitud.EstadoSolicitud.PENDIENTE);
+            solicitud.setIdSolicitante(request.getIdSolicitante());
+            solicitud.setIdTipologia(request.getIdTipologia());
+            solicitud.setOrdenFirmaBoolean(request.getOrdenFirma());
+
+            // IMPORTANTE: Establecer el estado desde la BD
+            solicitud.setEstado(estadoPendiente);
+
+            // Establecer campos opcionales
+            solicitud.setNombreSolicitud("Solicitud de documento - " +
+                    LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+            solicitud.setFechaRegistro(LocalDateTime.now());
 
             // Guardar PDF principal
             String pdfPath = storageService.guardarArchivo(
-                    request.getPdfPrincipal(), "pdf_" + System.currentTimeMillis());
+                    request.getPdfPrincipal(),
+                    "pdf_" + System.currentTimeMillis());
             solicitud.setPdfPath(pdfPath);
             solicitud.setPdfOriginalName(request.getPdfPrincipal().getOriginalFilename());
             solicitud.setPdfSizeBytes(request.getPdfPrincipal().getSize());
 
+            // Guardar solicitud
             solicitud = solicitudRepository.save(solicitud);
+
+            log.info("Solicitud guardada con ID: {}, Estado: {}",
+                    solicitud.getId(), solicitud.getEstado().getDescripcion());
 
             // Crear destinatarios
             crearDestinatarios(solicitud, request.getDestinatarios());
@@ -83,14 +102,15 @@ public class SolicitudService {
             // Crear historial
             crearHistorial(solicitud, request.getIdSolicitante(),
                     SolicitudHistorial.AccionEnum.CREAR,
-                    request.getComentarioInicial());
+                    request.getComentarioInicial() != null ?
+                            request.getComentarioInicial() : "Solicitud creada");
 
-            log.info("Solicitud creada: {}", solicitud.getId());
+            log.info("Solicitud creada exitosamente: {}", solicitud.getId());
             return mapearADetalle(solicitud);
 
         } catch (Exception e) {
             log.error("Error al crear solicitud", e);
-            throw new RuntimeException("Error al crear la solicitud: " + e.getMessage());
+            throw new RuntimeException("Error al crear la solicitud: " + e.getMessage(), e);
         }
     }
 
@@ -98,23 +118,21 @@ public class SolicitudService {
         Solicitud solicitud = obtenerSolicitudPendiente(solicitudId);
 
         if (!flujoService.puedeAprobar(solicitudId, request.getUsuarioId(),
-                solicitud.getOrdenFirma())) {
+                solicitud.getOrdenFirmaBoolean())) {
             throw new IllegalStateException("Usuario no autorizado para aprobar en este momento");
         }
 
-        // Actualizar decisión del destinatario
         SolicitudDestinatario destinatario = destinatarioRepository
                 .findBySolicitudIdAndUsuarioId(solicitudId, request.getUsuarioId())
                 .orElseThrow(() -> new IllegalStateException("Destinatario no encontrado"));
 
-        destinatario.setDecision(SolicitudDestinatario.DecisionEnum.APROBADO);
-        destinatario.setComentario(request.getComentario());
-        destinatario.setFechaDecision(LocalDateTime.now());
+        destinatario.aprobar(request.getComentario());
         destinatarioRepository.save(destinatario);
 
-        // Verificar si todos aprobaron
         if (flujoService.todosAprobaron(solicitudId)) {
-            solicitud.setEstado(Solicitud.EstadoSolicitud.APROBADO);
+            // Cambiar estado a APROBADO
+            Estado estadoAprobado = estadoRepository.getEstadoAprobado();
+            solicitud.setEstado(estadoAprobado);
             solicitudRepository.save(solicitud);
 
             crearHistorial(solicitud, request.getUsuarioId(),
@@ -128,18 +146,16 @@ public class SolicitudService {
     public void rechazar(Integer solicitudId, DecisionRequest request) {
         Solicitud solicitud = obtenerSolicitudPendiente(solicitudId);
 
-        // Verificar que el usuario sea destinatario
         SolicitudDestinatario destinatario = destinatarioRepository
                 .findBySolicitudIdAndUsuarioId(solicitudId, request.getUsuarioId())
                 .orElseThrow(() -> new IllegalStateException("Usuario no autorizado para rechazar"));
 
-        // Actualizar estado
-        solicitud.setEstado(Solicitud.EstadoSolicitud.RECHAZADO);
+        // Cambiar estado a RECHAZADO
+        Estado estadoRechazado = estadoRepository.getEstadoRechazado();
+        solicitud.setEstado(estadoRechazado);
         solicitudRepository.save(solicitud);
 
-        destinatario.setDecision(SolicitudDestinatario.DecisionEnum.RECHAZADO);
-        destinatario.setComentario(request.getComentario());
-        destinatario.setFechaDecision(LocalDateTime.now());
+        destinatario.rechazar(request.getComentario());
         destinatarioRepository.save(destinatario);
 
         // Eliminar archivos
@@ -155,7 +171,7 @@ public class SolicitudService {
     public void cancelar(Integer solicitudId, DecisionRequest request) {
         Solicitud solicitud = obtenerSolicitudPendiente(solicitudId);
 
-        // Verificar autorización (creador o destinatario)
+        // Verificar autorización
         boolean esCreador = solicitud.getIdSolicitante().equals(request.getUsuarioId());
         boolean esDestinatario = destinatarioRepository
                 .findBySolicitudIdAndUsuarioId(solicitudId, request.getUsuarioId()).isPresent();
@@ -164,58 +180,169 @@ public class SolicitudService {
             throw new IllegalStateException("Usuario no autorizado para cancelar");
         }
 
-        // Actualizar estado
-        solicitud.setEstado(Solicitud.EstadoSolicitud.CANCELADA);
+        // Cambiar estado a CANCELADA
+        Estado estadoCancelado = estadoRepository.getEstadoCancelado();
+        solicitud.setEstado(estadoCancelado);
         solicitudRepository.save(solicitud);
 
         // Eliminar archivos
         eliminarArchivos(solicitud);
 
         // Crear historial
-        crearHistorial(solicitud, request.getUsuarioId(),
-                SolicitudHistorial.AccionEnum.CANCELAR, request.getComentario());
+        SolicitudHistorial historial = SolicitudHistorial.crear(
+                solicitud, request.getUsuarioId(),
+                SolicitudHistorial.AccionEnum.CANCELAR,
+                request.getComentario());
+        historialRepository.save(historial);
 
         log.info("Solicitud {} cancelada por usuario {}", solicitudId, request.getUsuarioId());
     }
 
-    // Métodos auxiliares privados...
-    private void validarPdfPrincipal(MultipartFile pdf) {
-        if (pdf == null || pdf.isEmpty()) {
-            throw new IllegalArgumentException("PDF principal es obligatorio");
-        }
-        if (!pdf.getContentType().equals("application/pdf")) {
-            throw new IllegalArgumentException("Solo se permiten archivos PDF");
-        }
-        if (!storageService.validarTamano(pdf.getSize(), maxPdfBytes)) {
-            throw new IllegalArgumentException("PDF excede el tamaño máximo permitido");
-        }
-    }
+    // ================ MÉTODOS AUXILIARES ================
 
     private Solicitud obtenerSolicitudPendiente(Integer solicitudId) {
         Solicitud solicitud = solicitudRepository.findById(solicitudId)
                 .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
 
-        if (solicitud.getEstado() != Solicitud.EstadoSolicitud.PENDIENTE) {
+        if (!solicitud.estaPendiente()) {
             throw new IllegalStateException("La solicitud no está en estado PENDIENTE");
         }
 
         return solicitud;
     }
+
+    @Transactional(readOnly = true)
+    public Page<SolicitudResumenResponse> listarPorCreador(Integer creadorId, String estado, Pageable pageable) {
+        Page<Solicitud> solicitudes;
+
+        if (estado != null && !estado.trim().isEmpty()) {
+            // Buscar el estado en la BD
+            Estado estadoEntity = estadoRepository.findByDescripcion(estado.toUpperCase())
+                    .orElseThrow(() -> new IllegalArgumentException("Estado no válido: " + estado));
+
+            solicitudes = solicitudRepository.findByIdSolicitanteAndEstado(
+                    creadorId, estadoEntity, pageable);
+        } else {
+            solicitudes = solicitudRepository.findByIdSolicitante(creadorId, pageable);
+        }
+
+        return solicitudes.map(this::mapearAResumen);
+    }
+
+    // ================ MÉTODOS DE MAPEO ================
+
+    private SolicitudDetalleResponse mapearADetalle(Solicitud solicitud) {
+        List<AdjuntoResponse> adjuntos = adjuntoRepository.findBySolicitudId(solicitud.getId())
+                .stream()
+                .map(adj -> AdjuntoResponse.builder()
+                        .id(adj.getId())
+                        .originalName(adj.getOriginalName())
+                        .sizeBytes(adj.getSizeBytes())
+                        .mime(adj.getMime())
+                        .build())
+                .collect(Collectors.toList());
+
+        List<DestinatarioResponse> destinatarios = destinatarioRepository
+                .findBySolicitudId(solicitud.getId())
+                .stream()
+                .map(dest -> DestinatarioResponse.builder()
+                        .usuarioId(dest.getUsuarioId())
+                        .ordenIndex(dest.getOrdenIndex())
+                        .decision(dest.getDecision().name())
+                        .fechaDecision(dest.getFechaDecision())
+                        .comentario(dest.getComentario())
+                        .build())
+                .collect(Collectors.toList());
+
+        Long aprobados = destinatarioRepository.countAprobadosBySolicitudId(solicitud.getId());
+        Long total = destinatarioRepository.countTotalBySolicitudId(solicitud.getId());
+
+        return SolicitudDetalleResponse.builder()
+                .id(solicitud.getId())
+                .estado(solicitud.getEstado().getDescripcion()) // Usar descripción del estado
+                .idTipologia(solicitud.getIdTipologia())
+                .createdAt(solicitud.getCreatedAt())
+                .createdBy(solicitud.getIdSolicitante())
+                .ordenFirma(solicitud.getOrdenFirmaBoolean())
+                .destinatariosTotal(total.intValue())
+                .destinatariosAprobados(aprobados.intValue())
+                .pdfOriginalName(solicitud.getPdfOriginalName())
+                .pdfSizeBytes(solicitud.getPdfSizeBytes())
+                .adjuntos(adjuntos)
+                .destinatarios(destinatarios)
+                .build();
+    }
+
+    private SolicitudResumenResponse mapearAResumen(Solicitud solicitud) {
+        Long aprobados = destinatarioRepository.countAprobadosBySolicitudId(solicitud.getId());
+        Long total = destinatarioRepository.countTotalBySolicitudId(solicitud.getId());
+
+        return SolicitudResumenResponse.builder()
+                .id(solicitud.getId())
+                .estado(solicitud.getEstado().getDescripcion()) // Usar descripción del estado
+                .idTipologia(solicitud.getIdTipologia())
+                .createdAt(solicitud.getCreatedAt())
+                .createdBy(solicitud.getIdSolicitante())
+                .ordenFirma(solicitud.getOrdenFirmaBoolean())
+                .destinatariosTotal(total.intValue())
+                .destinatariosAprobados(aprobados.intValue())
+                .build();
+    }
+
+
+
+
+
+
+
+    private void validarPdfPrincipal(MultipartFile pdf) {
+        if (pdf == null || pdf.isEmpty()) {
+            throw new IllegalArgumentException("PDF principal es obligatorio");
+        }
+
+        String contentType = pdf.getContentType();
+        if (contentType == null || !contentType.equals("application/pdf")) {
+            throw new IllegalArgumentException("Solo se permiten archivos PDF para el documento principal");
+        }
+
+        String fileName = pdf.getOriginalFilename();
+        if (fileName == null || !fileName.toLowerCase().endsWith(".pdf")) {
+            throw new IllegalArgumentException("El archivo principal debe tener extensión .pdf");
+        }
+
+        if (!storageService.validarTamano(pdf.getSize(), maxPdfBytes)) {
+            throw new IllegalArgumentException("PDF excede el tamaño máximo permitido de " +
+                    (maxPdfBytes / 1024 / 1024) + "MB");
+        }
+    }
+
     private void validarAdjuntos(MultipartFile[] adjuntos) {
         for (MultipartFile adjunto : adjuntos) {
             if (adjunto.isEmpty()) continue;
 
-            if (!storageService.validarExtension(adjunto.getOriginalFilename(), allowedExtensions)) {
-                throw new IllegalArgumentException("Extensión no permitida: " +
-                        FilenameUtils.getExtension(adjunto.getOriginalFilename()));
+            String fileName = adjunto.getOriginalFilename();
+            if (fileName == null) {
+                throw new IllegalArgumentException("Nombre de archivo adjunto no válido");
+            }
+
+            if (!storageService.validarExtension(fileName, allowedExtensions)) {
+                String extension = "";
+                int lastDot = fileName.lastIndexOf('.');
+                if (lastDot > 0) {
+                    extension = fileName.substring(lastDot + 1);
+                }
+                throw new IllegalArgumentException("Extensión no permitida para adjuntos: " + extension +
+                        ". Extensiones permitidas: " + String.join(", ", allowedExtensions));
             }
 
             if (!storageService.validarTamano(adjunto.getSize(), maxAttachmentBytes)) {
-                throw new IllegalArgumentException("Adjunto excede el tamaño máximo permitido: " +
-                        adjunto.getOriginalFilename());
+                throw new IllegalArgumentException("Adjunto '" + fileName + "' excede el tamaño máximo permitido de " +
+                        (maxAttachmentBytes / 1024 / 1024) + "MB");
             }
         }
     }
+
+
 
     private void crearDestinatarios(Solicitud solicitud, Integer[] destinatariosIds) {
         List<SolicitudDestinatario> destinatarios = new ArrayList<>();
@@ -262,24 +389,16 @@ public class SolicitudService {
 
     private void crearHistorial(Solicitud solicitud, Integer usuarioId,
                                 SolicitudHistorial.AccionEnum accion, String comentario) {
-        SolicitudHistorial historial = new SolicitudHistorial();
-        historial.setSolicitud(solicitud);
-        historial.setActorUsuarioId(usuarioId);
-        historial.setAccion(accion);
-        historial.setComentario(comentario);
-        historial.setFecha(LocalDateTime.now());
-
+        SolicitudHistorial historial = SolicitudHistorial.crear(solicitud, usuarioId, accion, comentario);
         historialRepository.save(historial);
     }
 
     private void eliminarArchivos(Solicitud solicitud) {
         try {
-            // Eliminar PDF principal
             if (solicitud.getPdfPath() != null) {
                 storageService.borrarArchivo(solicitud.getPdfPath());
             }
 
-            // Eliminar adjuntos
             List<SolicitudAdjunto> adjuntos = adjuntoRepository.findBySolicitudId(solicitud.getId());
             for (SolicitudAdjunto adjunto : adjuntos) {
                 storageService.borrarArchivo(adjunto.getPath());
@@ -289,51 +408,9 @@ public class SolicitudService {
 
         } catch (Exception e) {
             log.error("Error al eliminar archivos de solicitud: {}", solicitud.getId(), e);
-            // No revertir transacción por error de eliminación de archivos
         }
     }
 
-    private SolicitudDetalleResponse mapearADetalle(Solicitud solicitud) {
-        List<AdjuntoResponse> adjuntos = adjuntoRepository.findBySolicitudId(solicitud.getId())
-                .stream()
-                .map(adj -> AdjuntoResponse.builder()
-                        .id(adj.getId())
-                        .originalName(adj.getOriginalName())
-                        .sizeBytes(adj.getSizeBytes())
-                        .mime(adj.getMime())
-                        .build())
-                .collect(Collectors.toList());
-
-        List<DestinatarioResponse> destinatarios = destinatarioRepository
-                .findBySolicitudId(solicitud.getId())
-                .stream()
-                .map(dest -> DestinatarioResponse.builder()
-                        .usuarioId(dest.getUsuarioId())
-                        .ordenIndex(dest.getOrdenIndex())
-                        .decision(dest.getDecision().name())
-                        .fechaDecision(dest.getFechaDecision())
-                        .comentario(dest.getComentario())
-                        .build())
-                .collect(Collectors.toList());
-
-        Long aprobados = destinatarioRepository.countAprobadosBySolicitudId(solicitud.getId());
-        Long total = destinatarioRepository.countTotalBySolicitudId(solicitud.getId());
-
-        return SolicitudDetalleResponse.builder()
-                .id(solicitud.getId())
-                .estado(solicitud.getEstado().name())
-                .tipologiaId(solicitud.getTipologiaId())
-                .createdAt(solicitud.getCreatedAt())
-                .createdBy(solicitud.getIdSolicitante())
-                .ordenFirma(solicitud.getOrdenFirma())
-                .destinatariosTotal(total.intValue())
-                .destinatariosAprobados(aprobados.intValue())
-                .pdfOriginalName(solicitud.getPdfOriginalName())
-                .pdfSizeBytes(solicitud.getPdfSizeBytes())
-                .adjuntos(adjuntos)
-                .destinatarios(destinatarios)
-                .build();
-    }
 
     @Transactional(readOnly = true)
     public SolicitudDetalleResponse obtenerDetalle(Integer solicitudId) {
@@ -343,45 +420,32 @@ public class SolicitudService {
         return mapearADetalle(solicitud);
     }
 
-    @Transactional(readOnly = true)
-    public Page<SolicitudResumenResponse> listarPorCreador(Integer creadorId, String estado, Pageable pageable) {
-        Page<Solicitud> solicitudes;
 
-        if (estado != null && !estado.trim().isEmpty()) {
-            Solicitud.EstadoSolicitud estadoEnum = Solicitud.EstadoSolicitud.valueOf(estado.toUpperCase());
-            solicitudes = solicitudRepository.findByIdSolicitanteAndEstado(creadorId, estadoEnum, pageable);
-        } else {
-            solicitudes = solicitudRepository.findByIdSolicitante(creadorId, pageable);
-        }
 
-        return solicitudes.map(this::mapearAResumen);
-    }
+
 
     @Transactional(readOnly = true)
-    public Page<SolicitudResumenResponse> listarParaGestionar(Long usuarioId, Pageable pageable) {
-        // Buscar solicitudes donde el usuario puede gestionar
-        Page<Solicitud> solicitudes = solicitudRepository.findPendientesParaGestionar(
-                usuarioId, true, pageable); // Considerar orden secuencial
-
-        return solicitudes.map(this::mapearAResumen);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<SolicitudResumenResponse> listarHistorico(Long usuarioId, Pageable pageable) {
+    public Page<SolicitudResumenResponse> listarHistorico(Integer usuarioId, Pageable pageable) {
         Page<Solicitud> solicitudes = solicitudRepository.findHistoricoUsuario(usuarioId, pageable);
         return solicitudes.map(this::mapearAResumen);
     }
+    @Transactional(readOnly = true)
+    public Page<SolicitudResumenResponse> listarFinalizadas(Integer tipologiaId, String estado, Pageable pageable) {
+        Page<Solicitud> solicitudes = solicitudRepository
+                .findByIdTipologiaAndEstado_DescripcionIgnoreCase(tipologiaId, estado, pageable);
+        return solicitudes.map(this::mapearAResumen);
+    }
+
 
     @Transactional(readOnly = true)
-    public Page<SolicitudResumenResponse> listarFinalizadas(Long tipologiaId, String estado, Pageable pageable) {
-        Solicitud.EstadoSolicitud estadoEnum = Solicitud.EstadoSolicitud.valueOf(estado.toUpperCase());
-        Page<Solicitud> solicitudes = solicitudRepository.findByTipologiaIdAndEstado(tipologiaId, estadoEnum, pageable);
+    public Page<SolicitudResumenResponse> listarParaGestionar(Integer usuarioId, Pageable pageable) {
+        Page<Solicitud> solicitudes = solicitudRepository.findPendientesParaGestionar(
+                usuarioId, true, pageable);
         return solicitudes.map(this::mapearAResumen);
     }
 
     @Transactional(readOnly = true)
     public List<AdjuntoResponse> listarAdjuntos(Integer solicitudId) {
-        // Verificar que la solicitud existe
         if (!solicitudRepository.existsById(solicitudId)) {
             throw new EntityNotFoundException("Solicitud no encontrada");
         }
@@ -398,7 +462,7 @@ public class SolicitudService {
     }
 
     @Transactional(readOnly = true)
-    public InputStream descargarAdjunto(Integer solicitudId, Integer adjuntoId) throws Exception {
+    public InputStream descargarAdjunto(Integer solicitudId, Long adjuntoId) throws Exception {
         SolicitudAdjunto adjunto = adjuntoRepository.findById(adjuntoId)
                 .orElseThrow(() -> new EntityNotFoundException("Adjunto no encontrado"));
 
@@ -426,27 +490,15 @@ public class SolicitudService {
     }
 
     @Transactional(readOnly = true)
-    public String obtenerNombreAdjunto(Integer adjuntoId) {
+    public String obtenerNombreAdjunto(Long adjuntoId) {
         SolicitudAdjunto adjunto = adjuntoRepository.findById(adjuntoId)
                 .orElseThrow(() -> new EntityNotFoundException("Adjunto no encontrado"));
 
         return adjunto.getOriginalName();
     }
 
-    private SolicitudResumenResponse mapearAResumen(Solicitud solicitud) {
-        Long aprobados = destinatarioRepository.countAprobadosBySolicitudId(solicitud.getId());
-        Long total = destinatarioRepository.countTotalBySolicitudId(solicitud.getId());
 
-        return SolicitudResumenResponse.builder()
-                .id(solicitud.getId())
-                .estado(solicitud.getEstado().name())
-                .tipologiaId(solicitud.getTipologiaId())
-                .createdAt(solicitud.getCreatedAt())
-                .createdBy(solicitud.getIdSolicitante())
-                .ordenFirma(solicitud.getOrdenFirma())
-                .destinatariosTotal(total.intValue())
-                .destinatariosAprobados(aprobados.intValue())
-                .build();
-    }
+
+
 
 }

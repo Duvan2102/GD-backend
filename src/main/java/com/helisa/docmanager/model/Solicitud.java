@@ -13,38 +13,66 @@ import java.util.List;
 @Data
 @Entity
 @Table(name = "solicitudes", indexes = {
-        @Index(name = "idx_solicitud_estado", columnList = "estado"),
+        @Index(name = "idx_solicitud_estado", columnList = "id_estado"),
         @Index(name = "idx_solicitud_solicitante", columnList = "id_solicitante"),
-        @Index(name = "idx_solicitud_tipologia", columnList = "tipologia_id")
+        @Index(name = "idx_solicitud_tipologia", columnList = "id_tipologia")
 })
-@EqualsAndHashCode(exclude = {"destinatarios", "adjuntos", "historial"})
-@ToString(exclude = {"destinatarios", "adjuntos", "historial"})
+@EqualsAndHashCode(exclude = {"estado", "destinatariosDetalle", "adjuntos", "historial", "tipologia"})
+@ToString(exclude = {"estado", "destinatariosDetalle", "adjuntos", "historial", "tipologia"})
 public class Solicitud {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
+    @Column(name = "nombre_solicitud")
+    private String nombreSolicitud;
+
     @NotNull
     @Column(name = "id_solicitante", nullable = false)
     private Integer idSolicitante;
 
     @NotNull
-    @Enumerated(EnumType.STRING)
-    @Column(name = "estado", nullable = false, length = 20)
-    private EstadoSolicitud estado = EstadoSolicitud.PENDIENTE;
-
-    @NotNull
     @Column(name = "id_tipologia", nullable = false)
-    private Integer tipologiaId;
+    private Integer idTipologia;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_tipologia", insertable = false, updatable = false)
     private Tipologia tipologia;
 
+    @Column(name = "detalles_adicionales", columnDefinition = "TEXT")
+    private String detallesAdicionales;
+
+    @Column(name = "prioridad")
+    private String prioridad;
+
+    @Column(name = "enviar_recordatorio")
+    private Boolean enviarRecordatorio;
+
+    @Column(name = "documento_principal")
+    private String documentoPrincipal;
+
+    @Column(name = "documentos_adicionales", columnDefinition = "TEXT")
+    private String documentosAdicionales;
+
+    @Column(name = "destinatarios", columnDefinition = "TEXT")
+    private String destinatarios;
+
+    @Column(name = "orden_firma")
+    private String ordenFirma;
+
+    @Column(name = "fecha_registro")
+    private LocalDateTime fechaRegistro;
+
+    // ===== RELACIÓN CORRECTA CON ESTADO =====
     @NotNull
-    @Column(name = "orden_firma", nullable = false)
-    private Boolean ordenFirma;
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "id_estado", nullable = false)
+    private Estado estado;
+
+    @NotNull
+    @Column(name = "orden_firma_boolean", nullable = false)
+    private Boolean ordenFirmaBoolean = false;
 
     @NotNull
     @Column(name = "pdf_path", nullable = false)
@@ -70,7 +98,7 @@ public class Solicitud {
     private Integer version;
 
     @OneToMany(mappedBy = "solicitud", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<SolicitudDestinatario> destinatarios;
+    private List<SolicitudDestinatario> destinatariosDetalle;
 
     @OneToMany(mappedBy = "solicitud", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<SolicitudAdjunto> adjuntos;
@@ -78,7 +106,57 @@ public class Solicitud {
     @OneToMany(mappedBy = "solicitud", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<SolicitudHistorial> historial;
 
-    public enum EstadoSolicitud {
-        PENDIENTE, APROBADO, RECHAZADO, CANCELADA
+    // ===== CONSTANTES DE ESTADO =====
+    public static final Integer ESTADO_PENDIENTE_ID = 1;
+    public static final Integer ESTADO_APROBADO_ID = 2;
+    public static final Integer ESTADO_RECHAZADO_ID = 3;
+    public static final Integer ESTADO_CANCELADO_ID = 4;
+
+    public static final String ESTADO_PENDIENTE = "PENDIENTE";
+    public static final String ESTADO_APROBADO = "APROBADO";
+    public static final String ESTADO_RECHAZADO = "RECHAZADO";
+    public static final String ESTADO_CANCELADO = "CANCELADA";
+
+    // ===== MÉTODOS DE UTILIDAD =====
+    @PrePersist
+    private void prePersist() {
+        if (this.fechaRegistro == null) {
+            this.fechaRegistro = LocalDateTime.now();
+        }
+        if (this.nombreSolicitud == null || this.nombreSolicitud.trim().isEmpty()) {
+            this.nombreSolicitud = "Solicitud " + System.currentTimeMillis();
+        }
+    }
+
+    public boolean esOrdenSecuencial() {
+        return Boolean.TRUE.equals(this.ordenFirmaBoolean);
+    }
+
+    public boolean estaPendiente() {
+        return this.estado != null && this.estado.getIdEstado().equals(ESTADO_PENDIENTE_ID);
+    }
+
+    public boolean estaAprobado() {
+        return this.estado != null && this.estado.getIdEstado().equals(ESTADO_APROBADO_ID);
+    }
+
+    public boolean estaRechazado() {
+        return this.estado != null && this.estado.getIdEstado().equals(ESTADO_RECHAZADO_ID);
+    }
+
+    public boolean estaCancelado() {
+        return this.estado != null && this.estado.getIdEstado().equals(ESTADO_CANCELADO_ID);
+    }
+
+    public boolean estaFinalizado() {
+        return !estaPendiente();
+    }
+
+    public String getEstadoDescripcion() {
+        return this.estado != null ? this.estado.getDescripcion() : null;
+    }
+
+    public Integer getIdEstado() {
+        return this.estado != null ? this.estado.getIdEstado() : null;
     }
 }

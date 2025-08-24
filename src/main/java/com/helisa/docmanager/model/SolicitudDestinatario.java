@@ -3,6 +3,8 @@ package com.helisa.docmanager.model;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
@@ -10,7 +12,9 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "solicitud_destinatario", indexes = {
         @Index(name = "idx_dest_solicitud", columnList = "solicitud_id"),
-        @Index(name = "idx_dest_usuario", columnList = "usuario_id")
+        @Index(name = "idx_dest_usuario", columnList = "usuario_id"),
+        @Index(name = "idx_dest_decision", columnList = "decision"),
+        @Index(name = "idx_dest_orden", columnList = "solicitud_id, orden_index")
 })
 public class SolicitudDestinatario {
 
@@ -24,7 +28,7 @@ public class SolicitudDestinatario {
 
     @NotNull
     @Column(name = "usuario_id", nullable = false)
-    private Integer usuarioId; // ✅ CAMBIAR A Integer PARA CONSISTENCIA
+    private Integer usuarioId;
 
     @NotNull
     @Column(name = "orden_index", nullable = false)
@@ -41,7 +45,36 @@ public class SolicitudDestinatario {
     @Column(name = "fecha_decision")
     private LocalDateTime fechaDecision;
 
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
     public enum DecisionEnum {
         PENDIENTE, APROBADO, RECHAZADO, CANCELADO
+    }
+
+    // Métodos de utilidad
+    public boolean estaPendiente() {
+        return DecisionEnum.PENDIENTE.equals(this.decision);
+    }
+
+    public boolean haDecidido() {
+        return !DecisionEnum.PENDIENTE.equals(this.decision);
+    }
+
+    public void aprobar(String comentario) {
+        this.decision = DecisionEnum.APROBADO;
+        this.comentario = comentario;
+        this.fechaDecision = LocalDateTime.now();
+    }
+
+    public void rechazar(String comentario) {
+        this.decision = DecisionEnum.RECHAZADO;
+        this.comentario = comentario;
+        this.fechaDecision = LocalDateTime.now();
     }
 }
