@@ -35,11 +35,11 @@ public class Solicitud {
     private EstadoSolicitud estado = EstadoSolicitud.PENDIENTE;
 
     @NotNull
-    @Column(name = "tipologia_id", nullable = false)
+    @Column(name = "id_tipologia", nullable = false)
     private Integer tipologiaId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "tipologia_id", insertable = false, updatable = false)
+    @JoinColumn(name = "id_tipologia", insertable = false, updatable = false)
     private Tipologia tipologia;
 
     @NotNull
