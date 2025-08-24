@@ -58,8 +58,8 @@ public class SolicitudService {
 
             // Crear solicitud
             Solicitud solicitud = new Solicitud();
-            solicitud.setIdSolicitante(request.getIdSolicitante());
-            solicitud.setTipologiaId(request.getTipologiaId());
+            solicitud.setIdSolicitante(request.getIdSolicitante()); // Integer
+            solicitud.setTipologiaId(request.getIdTipologia());
             solicitud.setOrdenFirma(request.getOrdenFirma());
             solicitud.setEstado(Solicitud.EstadoSolicitud.PENDIENTE);
 
@@ -94,7 +94,7 @@ public class SolicitudService {
         }
     }
 
-    public void aprobar(Long solicitudId, DecisionRequest request) {
+    public void aprobar(Integer solicitudId, DecisionRequest request) {
         Solicitud solicitud = obtenerSolicitudPendiente(solicitudId);
 
         if (!flujoService.puedeAprobar(solicitudId, request.getUsuarioId(),
@@ -125,7 +125,7 @@ public class SolicitudService {
         log.info("Solicitud {} aprobada por usuario {}", solicitudId, request.getUsuarioId());
     }
 
-    public void rechazar(Long solicitudId, DecisionRequest request) {
+    public void rechazar(Integer solicitudId, DecisionRequest request) {
         Solicitud solicitud = obtenerSolicitudPendiente(solicitudId);
 
         // Verificar que el usuario sea destinatario
@@ -152,7 +152,7 @@ public class SolicitudService {
         log.info("Solicitud {} rechazada por usuario {}", solicitudId, request.getUsuarioId());
     }
 
-    public void cancelar(Long solicitudId, DecisionRequest request) {
+    public void cancelar(Integer solicitudId, DecisionRequest request) {
         Solicitud solicitud = obtenerSolicitudPendiente(solicitudId);
 
         // Verificar autorización (creador o destinatario)
@@ -191,7 +191,7 @@ public class SolicitudService {
         }
     }
 
-    private Solicitud obtenerSolicitudPendiente(Long solicitudId) {
+    private Solicitud obtenerSolicitudPendiente(Integer solicitudId) {
         Solicitud solicitud = solicitudRepository.findById(solicitudId)
                 .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
 
@@ -217,7 +217,7 @@ public class SolicitudService {
         }
     }
 
-    private void crearDestinatarios(Solicitud solicitud, Long[] destinatariosIds) {
+    private void crearDestinatarios(Solicitud solicitud, Integer[] destinatariosIds) {
         List<SolicitudDestinatario> destinatarios = new ArrayList<>();
 
         for (int i = 0; i < destinatariosIds.length; i++) {
@@ -260,7 +260,7 @@ public class SolicitudService {
         adjuntoRepository.saveAll(adjuntosList);
     }
 
-    private void crearHistorial(Solicitud solicitud, Long usuarioId,
+    private void crearHistorial(Solicitud solicitud, Integer usuarioId,
                                 SolicitudHistorial.AccionEnum accion, String comentario) {
         SolicitudHistorial historial = new SolicitudHistorial();
         historial.setSolicitud(solicitud);
@@ -336,7 +336,7 @@ public class SolicitudService {
     }
 
     @Transactional(readOnly = true)
-    public SolicitudDetalleResponse obtenerDetalle(Long solicitudId) {
+    public SolicitudDetalleResponse obtenerDetalle(Integer solicitudId) {
         Solicitud solicitud = solicitudRepository.findById(solicitudId)
                 .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
 
@@ -344,7 +344,7 @@ public class SolicitudService {
     }
 
     @Transactional(readOnly = true)
-    public Page<SolicitudResumenResponse> listarPorCreador(Long creadorId, String estado, Pageable pageable) {
+    public Page<SolicitudResumenResponse> listarPorCreador(Integer creadorId, String estado, Pageable pageable) {
         Page<Solicitud> solicitudes;
 
         if (estado != null && !estado.trim().isEmpty()) {
@@ -380,7 +380,7 @@ public class SolicitudService {
     }
 
     @Transactional(readOnly = true)
-    public List<AdjuntoResponse> listarAdjuntos(Long solicitudId) {
+    public List<AdjuntoResponse> listarAdjuntos(Integer solicitudId) {
         // Verificar que la solicitud existe
         if (!solicitudRepository.existsById(solicitudId)) {
             throw new EntityNotFoundException("Solicitud no encontrada");
@@ -398,7 +398,7 @@ public class SolicitudService {
     }
 
     @Transactional(readOnly = true)
-    public InputStream descargarAdjunto(Long solicitudId, Long adjuntoId) throws Exception {
+    public InputStream descargarAdjunto(Integer solicitudId, Integer adjuntoId) throws Exception {
         SolicitudAdjunto adjunto = adjuntoRepository.findById(adjuntoId)
                 .orElseThrow(() -> new EntityNotFoundException("Adjunto no encontrado"));
 
@@ -410,7 +410,7 @@ public class SolicitudService {
     }
 
     @Transactional(readOnly = true)
-    public InputStream streamPdfPrincipal(Long solicitudId) throws Exception {
+    public InputStream streamPdfPrincipal(Integer solicitudId) throws Exception {
         Solicitud solicitud = solicitudRepository.findById(solicitudId)
                 .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
 
@@ -418,7 +418,7 @@ public class SolicitudService {
     }
 
     @Transactional(readOnly = true)
-    public String obtenerNombrePdf(Long solicitudId) {
+    public String obtenerNombrePdf(Integer solicitudId) {
         Solicitud solicitud = solicitudRepository.findById(solicitudId)
                 .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
 
@@ -426,7 +426,7 @@ public class SolicitudService {
     }
 
     @Transactional(readOnly = true)
-    public String obtenerNombreAdjunto(Long adjuntoId) {
+    public String obtenerNombreAdjunto(Integer adjuntoId) {
         SolicitudAdjunto adjunto = adjuntoRepository.findById(adjuntoId)
                 .orElseThrow(() -> new EntityNotFoundException("Adjunto no encontrado"));
 

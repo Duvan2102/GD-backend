@@ -23,12 +23,11 @@ public class Solicitud {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name="id_solicitud")
-    private Long id;
+    private Integer id;
 
     @NotNull
     @Column(name = "id_solicitante", nullable = false)
-    private Long idSolicitante;
+    private Integer idSolicitante;
 
     @NotNull
     @Enumerated(EnumType.STRING)
@@ -37,9 +36,8 @@ public class Solicitud {
 
     @NotNull
     @Column(name = "tipologia_id", nullable = false)
-    private Long tipologiaId;
+    private Integer tipologiaId;
 
-    // ✅ AGREGAR ESTA RELACIÓN PARA COMPATIBILIDAD CON TIPOLOGIA EXISTENTE
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tipologia_id", insertable = false, updatable = false)
     private Tipologia tipologia;

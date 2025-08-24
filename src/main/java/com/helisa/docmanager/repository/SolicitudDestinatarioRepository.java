@@ -15,24 +15,24 @@ public interface SolicitudDestinatarioRepository extends JpaRepository<Solicitud
     @Query("SELECT d FROM SolicitudDestinatario d " +
             "WHERE d.solicitud.id = :solicitudId " +
             "AND d.usuarioId = :usuarioId")
-    Optional<SolicitudDestinatario> findBySolicitudIdAndUsuarioId(@Param("solicitudId") Long solicitudId,
-                                                                  @Param("usuarioId") Long usuarioId);
+    Optional<SolicitudDestinatario> findBySolicitudIdAndUsuarioId(@Param("solicitudId") Integer solicitudId,
+                                                                  @Param("usuarioId") Integer usuarioId);
 
     @Query("SELECT d FROM SolicitudDestinatario d " +
             "WHERE d.solicitud.id = :solicitudId " +
             "AND d.decision = 'PENDIENTE' " +
             "ORDER BY d.ordenIndex")
-    List<SolicitudDestinatario> findPendientesBySolicitudId(@Param("solicitudId") Long solicitudId);
+    List<SolicitudDestinatario> findPendientesBySolicitudId(@Param("solicitudId") Integer solicitudId);
 
     @Query("SELECT COUNT(d) FROM SolicitudDestinatario d " +
             "WHERE d.solicitud.id = :solicitudId " +
             "AND d.decision = 'APROBADO'")
-    Long countAprobadosBySolicitudId(@Param("solicitudId") Long solicitudId);
+    Long countAprobadosBySolicitudId(@Param("solicitudId") Integer solicitudId);
 
     @Query("SELECT COUNT(d) FROM SolicitudDestinatario d " +
             "WHERE d.solicitud.id = :solicitudId")
-    Long countTotalBySolicitudId(@Param("solicitudId") Long solicitudId);
+    Long countTotalBySolicitudId(@Param("solicitudId") Integer solicitudId);
 
     @Query("SELECT d FROM SolicitudDestinatario d WHERE d.solicitud.id = :solicitudId")
-    List<SolicitudDestinatario> findBySolicitudId(@Param("solicitudId") Long solicitudId);
+    List<SolicitudDestinatario> findBySolicitudId(@Param("solicitudId") Integer solicitudId);
 }

@@ -2,7 +2,9 @@ package com.helisa.docmanager.model;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
+import lombok.Data;
 
+@Data // ✅ AGREGAR LOMBOK
 @Entity
 @Table(name = "comentarios")
 public class Comentario {
@@ -12,7 +14,7 @@ public class Comentario {
     private Integer idComentario;
 
     @NotNull
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_solicitud")
     private Solicitud solicitud;
 
@@ -20,7 +22,7 @@ public class Comentario {
     private String descripcion;
 
     @NotNull
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_usuario")
     private Usuario usuario;
 }

@@ -15,14 +15,14 @@ public class SolicitudHistorial {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Integer id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "solicitud_id", nullable = false)
     private Solicitud solicitud;
 
     @Column(name = "actor_usuario_id")
-    private Long actorUsuarioId;
+    private Integer actorUsuarioId;
 
     @NotNull
     @Enumerated(EnumType.STRING)

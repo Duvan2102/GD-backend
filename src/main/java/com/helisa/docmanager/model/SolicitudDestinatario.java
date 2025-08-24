@@ -24,7 +24,7 @@ public class SolicitudDestinatario {
 
     @NotNull
     @Column(name = "usuario_id", nullable = false)
-    private Long usuarioId;
+    private Integer usuarioId; // ✅ CAMBIAR A Integer PARA CONSISTENCIA
 
     @NotNull
     @Column(name = "orden_index", nullable = false)

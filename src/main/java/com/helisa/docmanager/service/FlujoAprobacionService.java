@@ -16,7 +16,7 @@ public class FlujoAprobacionService {
     @Autowired
     private SolicitudDestinatarioRepository destinatarioRepository;
 
-    public boolean puedeAprobar(Long solicitudId, Long usuarioId, boolean ordenFirma) {
+    public boolean puedeAprobar(Integer solicitudId, Integer usuarioId, boolean ordenFirma) {
         Optional<SolicitudDestinatario> destinatario =
                 destinatarioRepository.findBySolicitudIdAndUsuarioId(solicitudId, usuarioId);
 
@@ -37,13 +37,13 @@ public class FlujoAprobacionService {
                 pendientes.get(0).getUsuarioId().equals(usuarioId);
     }
 
-    public boolean todosAprobaron(Long solicitudId) {
+    public boolean todosAprobaron(Integer solicitudId) {
         Long aprobados = destinatarioRepository.countAprobadosBySolicitudId(solicitudId);
         Long total = destinatarioRepository.countTotalBySolicitudId(solicitudId);
         return aprobados.equals(total);
     }
 
-    public SolicitudDestinatario obtenerSiguienteAprobador(Long solicitudId) {
+    public SolicitudDestinatario obtenerSiguienteAprobador(Integer solicitudId) {
         List<SolicitudDestinatario> pendientes =
                 destinatarioRepository.findPendientesBySolicitudId(solicitudId);
         return pendientes.isEmpty() ? null : pendientes.get(0);
