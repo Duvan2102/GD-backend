@@ -70,10 +70,6 @@ public class Solicitud {
     @JoinColumn(name = "id_estado", nullable = false)
     private Estado estado;
 
-    // Campo para mantener compatibilidad si es necesario
-    @Column(name = "estado", insertable = false, updatable = false)
-    private String estadoDescripcion;
-
     @NotNull
     @Column(name = "orden_firma_boolean", nullable = false)
     private Boolean ordenFirmaBoolean = false;
