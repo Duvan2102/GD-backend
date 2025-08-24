@@ -1,42 +1,85 @@
 package com.helisa.docmanager.model;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Data
 @Entity
-@Table(name = "solicitudes")
+@Table(name = "solicitud", indexes = {
+        @Index(name = "idx_solicitud_estado", columnList = "estado"),
+        @Index(name = "idx_solicitud_solicitante", columnList = "id_solicitante"),
+        @Index(name = "idx_solicitud_tipologia", columnList = "tipologia_id")
+})
+@EqualsAndHashCode(exclude = {"destinatarios", "adjuntos", "historial"})
+@ToString(exclude = {"destinatarios", "adjuntos", "historial"})
 public class Solicitud {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer idSolicitud;
+    private Long id;
 
     @NotNull
-    private String nombreSolicitud;
+    @Column(name = "id_solicitante", nullable = false)
+    private Long idSolicitante;
 
     @NotNull
-    @ManyToOne
-    @JoinColumn(name = "id_tipologia")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "estado", nullable = false, length = 20)
+    private EstadoSolicitud estado = EstadoSolicitud.PENDIENTE;
+
+    @NotNull
+    @Column(name = "tipologia_id", nullable = false)
+    private Long tipologiaId;
+
+    // ✅ AGREGAR ESTA RELACIÓN PARA COMPATIBILIDAD CON TIPOLOGIA EXISTENTE
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tipologia_id", insertable = false, updatable = false)
     private Tipologia tipologia;
 
-    private String detallesAdicionales;
-    private String prioridad;
-    private Boolean enviarRecordatorio;
-    private String documentoPrincipal;
-    private String documentosAdicionales;
-    private String destinatarios;
-    private String ordenFirma;
-
-    private LocalDateTime fechaRegistro;
+    @NotNull
+    @Column(name = "orden_firma", nullable = false)
+    private Boolean ordenFirma;
 
     @NotNull
-    @ManyToOne
-    @JoinColumn(name = "id_estado")
-    private Estado estado;
+    @Column(name = "pdf_path", nullable = false)
+    private String pdfPath;
 
-    @JsonIgnore
-    @OneToMany(mappedBy = "solicitud")
-    private List<Comentario> comentarios;
+    @NotNull
+    @Column(name = "pdf_original_name", nullable = false)
+    private String pdfOriginalName;
+
+    @NotNull
+    @Column(name = "pdf_size_bytes", nullable = false)
+    private Long pdfSizeBytes = 0L;
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    @Version
+    private Integer version;
+
+    @OneToMany(mappedBy = "solicitud", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<SolicitudDestinatario> destinatarios;
+
+    @OneToMany(mappedBy = "solicitud", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<SolicitudAdjunto> adjuntos;
+
+    @OneToMany(mappedBy = "solicitud", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<SolicitudHistorial> historial;
+
+    public enum EstadoSolicitud {
+        PENDIENTE, APROBADO, RECHAZADO, CANCELADA
+    }
 }
