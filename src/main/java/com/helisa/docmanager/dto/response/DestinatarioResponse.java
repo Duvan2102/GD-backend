@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 @Data
 @Builder
 public class DestinatarioResponse {
-    private Long usuarioId;
+    private Integer usuarioId;
     private Integer ordenIndex;
     private String decision;
     private LocalDateTime fechaDecision;

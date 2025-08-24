@@ -11,13 +11,13 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 @Repository
-public interface SolicitudRepository extends JpaRepository<Solicitud, Long> {
+public interface SolicitudRepository extends JpaRepository<Solicitud, Integer> {
 
-    Page<Solicitud> findByIdSolicitanteAndEstado(Long idSolicitante,
+    Page<Solicitud> findByIdSolicitanteAndEstado(Integer idSolicitante,
                                                  Solicitud.EstadoSolicitud estado,
                                                  Pageable pageable);
 
-    Page<Solicitud> findByIdSolicitante(Long idSolicitante, Pageable pageable);
+    Page<Solicitud> findByIdSolicitante(Integer idSolicitante, Pageable pageable);
 
     @Query("SELECT s FROM Solicitud s " +
             "JOIN s.destinatarios d " +

@@ -40,34 +40,34 @@ public class SolicitudController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<SolicitudDetalleResponse> obtenerDetalle(@PathVariable Long id) {
+    public ResponseEntity<SolicitudDetalleResponse> obtenerDetalle(@PathVariable Integer id) {
         SolicitudDetalleResponse response = solicitudService.obtenerDetalle(id);
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/{id}/aprobar")
-    public ResponseEntity<Void> aprobar(@PathVariable Long id,
+    public ResponseEntity<Void> aprobar(@PathVariable Integer id,
                                         @Valid @RequestBody DecisionRequest request) {
         solicitudService.aprobar(id, request);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/{id}/rechazar")
-    public ResponseEntity<Void> rechazar(@PathVariable Long id,
+    public ResponseEntity<Void> rechazar(@PathVariable Integer id,
                                          @Valid @RequestBody DecisionRequest request) {
         solicitudService.rechazar(id, request);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/{id}/cancelar")
-    public ResponseEntity<Void> cancelar(@PathVariable Long id,
+    public ResponseEntity<Void> cancelar(@PathVariable Integer id,
                                          @Valid @RequestBody DecisionRequest request) {
         solicitudService.cancelar(id, request);
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("/{id}/pdf")
-    public ResponseEntity<InputStreamResource> streamPdf(@PathVariable Long id) {
+    public ResponseEntity<InputStreamResource> streamPdf(@PathVariable Integer id) {
         try {
             InputStream pdfStream = solicitudService.streamPdfPrincipal(id);
             String filename = solicitudService.obtenerNombrePdf(id);
@@ -85,14 +85,14 @@ public class SolicitudController {
     }
     // Más endpoints según especificación...
     @GetMapping("/{id}/adjuntos")
-    public ResponseEntity<List<AdjuntoResponse>> listarAdjuntos(@PathVariable Long id) {
+    public ResponseEntity<List<AdjuntoResponse>> listarAdjuntos(@PathVariable Integer id) {
         List<AdjuntoResponse> adjuntos = solicitudService.listarAdjuntos(id);
         return ResponseEntity.ok(adjuntos);
     }
 
     @GetMapping("/{id}/adjuntos/{adjuntoId}/download")
     public ResponseEntity<InputStreamResource> descargarAdjunto(
-            @PathVariable Long id, @PathVariable Long adjuntoId) {
+            @PathVariable Integer id, @PathVariable Integer adjuntoId) {
 
         try {
             InputStream adjuntoStream = solicitudService.descargarAdjunto(id, adjuntoId);
@@ -112,7 +112,7 @@ public class SolicitudController {
     // Endpoints de listado
     @GetMapping
     public ResponseEntity<Page<SolicitudResumenResponse>> listarPorCreador(
-            @RequestParam Long creadorId,
+            @RequestParam Integer creadorId,
             @RequestParam(required = false) String estado,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
 
