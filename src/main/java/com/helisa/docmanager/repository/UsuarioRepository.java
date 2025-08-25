@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,6 +19,7 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Integer> {
      * @return Optional con el usuario encontrado
      */
     Optional<Usuario> findByUsuario(String usuario);
+    List<Usuario> findByIdUsuarioIn(Collection<Integer> ids);
 
     /**
      * Buscar usuario por identificación

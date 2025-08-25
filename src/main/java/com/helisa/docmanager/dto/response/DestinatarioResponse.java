@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 public class DestinatarioResponse {
     private Integer usuarioId;
     private Integer ordenIndex;
+    private String nombre;
     private String decision;
     private LocalDateTime fechaDecision;
     private String comentario;
