@@ -19,9 +19,10 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @Transactional
@@ -42,6 +43,8 @@ public class SolicitudService {
     private FlujoAprobacionService flujoService;
     @Autowired
     private EstadoRepository estadoRepository;
+    @Autowired
+    private UsuarioRepository usuarioRepository;
 
     @Value("${storage.max-pdf-bytes:52428800}")
     private long maxPdfBytes;
@@ -273,21 +276,83 @@ public class SolicitudService {
                 .build();
     }
 
-    private SolicitudResumenResponse mapearAResumen(Solicitud solicitud) {
-        Long aprobados = destinatarioRepository.countAprobadosBySolicitudId(solicitud.getId());
-        Long total = destinatarioRepository.countTotalBySolicitudId(solicitud.getId());
+    private SolicitudResumenResponse mapearAResumen(Solicitud s) {
+        // ---- Preload de usuarios (solicitante + destinatarios) en 1 query ----
+        Set<Integer> ids = new HashSet<>();
+        if (s.getIdSolicitante() != null) ids.add(s.getIdSolicitante());
+        if (s.getDestinatariosDetalle() != null) {
+            for (SolicitudDestinatario d : s.getDestinatariosDetalle()) {
+                if (d.getUsuarioId() != null) ids.add(d.getUsuarioId());
+            }
+        }
+
+        Map<Integer, Usuario> usuarios = ids.isEmpty()
+                ? Collections.emptyMap()
+                : usuarioRepository.findByIdUsuarioIn(ids).stream()
+                .collect(Collectors.toMap(Usuario::getIdUsuario, Function.identity()));
+
+        // ---- Solicitante (nombre/cargo si lo necesitas) ----
+        Usuario solicitante = usuarios.get(s.getIdSolicitante());
+        String solicitanteNombre = (solicitante == null) ? null :
+                Stream.of(solicitante.getNombres(), solicitante.getApellidos())
+                        .filter(Objects::nonNull)
+                        .map(String::trim)
+                        .filter(str -> !str.isEmpty())
+                        .collect(Collectors.joining(" "));
+
+        String cargoSolicitante = (solicitante == null) ? null :
+                Stream.of(solicitante.getCargo().getDescripcion())
+                        .filter(Objects::nonNull)
+                        .map(String::trim)
+                        .filter(str -> !str.isEmpty())
+                        .collect(Collectors.joining(" "));
+
+        List<SolicitudDestinatario> det =
+                (s.getDestinatariosDetalle() != null) ? s.getDestinatariosDetalle() : List.of();
+
+        List<DestinatarioResponse> destinatarios = det.stream()
+                .map(d -> {
+                    Usuario u = usuarios.get(d.getUsuarioId());
+                    String nombre = (u == null) ? null :
+                            Stream.of(u.getNombres(), u.getApellidos())
+                                    .filter(Objects::nonNull)
+                                    .map(String::trim)
+                                    .filter(str -> !str.isEmpty())
+                                    .collect(Collectors.joining(" "));
+                    return DestinatarioResponse.builder()
+                            .usuarioId(d.getUsuarioId())
+                            .nombre(nombre) // <-- nuevo en tu DTO
+                            .ordenIndex(d.getOrdenIndex())
+                            .decision(d.getDecision() != null ? d.getDecision().name() : null)
+                            .fechaDecision(d.getFechaDecision())
+                            .comentario(d.getComentario())
+                            .build();
+                })
+                .toList();
+
+        int total = destinatarios.size();
+        int aprobados = (int) destinatarios.stream()
+                .map(DestinatarioResponse::getDecision)
+                .filter(Objects::nonNull)
+                .map(String::toUpperCase)
+                .filter("APROBADO"::equals)
+                .count();
 
         return SolicitudResumenResponse.builder()
-                .id(solicitud.getId())
-                .estado(solicitud.getEstado().getDescripcion()) // Usar descripción del estado
-                .idTipologia(solicitud.getIdTipologia())
-                .createdAt(solicitud.getCreatedAt())
-                .createdBy(solicitud.getIdSolicitante())
-                .ordenFirma(solicitud.getOrdenFirmaBoolean())
-                .destinatariosTotal(total.intValue())
-                .destinatariosAprobados(aprobados.intValue())
+                .id(s.getId())
+                .estado(s.getEstado() != null ? s.getEstado().getDescripcion() : null)
+                .idTipologia(s.getIdTipologia())
+                .createdAt(s.getCreatedAt())
+                .createdBy(s.getIdSolicitante())
+                .solicitanteCargo(cargoSolicitante)
+                .solicitanteName(solicitanteNombre)
+                .ordenFirma(Boolean.TRUE.equals(s.getOrdenFirmaBoolean()))
+                .destinatarios(destinatarios)
+                .destinatariosTotal(total)
+                .destinatariosAprobados(aprobados)
                 .build();
     }
+
 
 
 
