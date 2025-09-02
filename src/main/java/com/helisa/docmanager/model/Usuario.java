@@ -1,17 +1,20 @@
 package com.helisa.docmanager.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.ToString;
 
 import java.util.List;
 
 @Data
 @Entity
 @Table(name = "usuarios")
+@ToString(exclude = {"password"})
 public class Usuario {
 
     @Id
@@ -60,6 +63,7 @@ public class Usuario {
     @OneToMany(mappedBy = "usuario")
     private List<Comentario> comentarios;
 
+	@JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
 	private String password;
 
 }

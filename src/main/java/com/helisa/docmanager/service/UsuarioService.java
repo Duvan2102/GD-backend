@@ -2,12 +2,15 @@ package com.helisa.docmanager.service;
 
 import com.helisa.docmanager.model.Cargo;
 import com.helisa.docmanager.model.Usuario;
+import com.helisa.docmanager.model.Estado;
 import com.helisa.docmanager.repository.CargoRepository;
 import com.helisa.docmanager.repository.UsuarioRepository;
+import com.helisa.docmanager.repository.EstadoRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.util.List;
 import java.util.Optional;
@@ -22,6 +25,11 @@ public class UsuarioService {
 
     @Autowired
     private CargoRepository cargoRepository;
+
+    @Autowired
+    private EstadoRepository estadoRepository;
+
+    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
     /**
      * Crear un nuevo usuario
      * @param usuario Usuario a crear
@@ -55,6 +63,8 @@ public class UsuarioService {
         if (usuario.getPassword() == null || usuario.getPassword().trim().isEmpty()) {
             usuario.setPassword(generarContrasenaAleatoria(12));
         }
+        // Hash de contraseña
+        usuario.setPassword(passwordEncoder.encode(usuario.getPassword()));
 
         return usuarioRepository.save(usuario);
     }
@@ -216,5 +226,37 @@ public class UsuarioService {
     @Transactional(readOnly = true)
     public List<Usuario> obtenerUsuariosPorCargo(Integer cargoId) {
         return usuarioRepository.findByCargo_IdCargo(cargoId);
+    }
+
+    // ===== Nuevas operaciones =====
+    @Transactional
+    public Usuario activarUsuario(Integer id) {
+        Usuario usuario = usuarioRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado con ID: " + id));
+        Estado activo = estadoRepository.findByDescripcion("ACTIVO")
+                .orElseThrow(() -> new RuntimeException("Estado ACTIVO no encontrado en BD"));
+        usuario.setEstado(activo);
+        return usuarioRepository.save(usuario);
+    }
+
+    @Transactional
+    public Usuario desactivarUsuario(Integer id) {
+        Usuario usuario = usuarioRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado con ID: " + id));
+        Estado inactivo = estadoRepository.findByDescripcion("INACTIVO")
+                .orElseThrow(() -> new RuntimeException("Estado INACTIVO no encontrado en BD"));
+        usuario.setEstado(inactivo);
+        return usuarioRepository.save(usuario);
+    }
+
+    @Transactional
+    public Usuario cambiarPassword(Integer id, String nuevaPassword) {
+        if (nuevaPassword == null || nuevaPassword.trim().isEmpty()) {
+            throw new IllegalArgumentException("La nueva contraseña es obligatoria");
+        }
+        Usuario usuario = usuarioRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado con ID: " + id));
+        usuario.setPassword(passwordEncoder.encode(nuevaPassword));
+        return usuarioRepository.save(usuario);
     }
 }
