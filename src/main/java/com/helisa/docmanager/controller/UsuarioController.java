@@ -1,6 +1,7 @@
 package com.helisa.docmanager.controller;
 
 import com.helisa.docmanager.model.Usuario;
+import com.helisa.docmanager.model.CambiarPasswordRequest;
 import com.helisa.docmanager.service.UsuarioService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -136,6 +137,52 @@ public class UsuarioController {
             return ResponseEntity.ok(usuarios);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @PutMapping("/{id}/activar")
+    public ResponseEntity<?> activarUsuario(@PathVariable Integer id) {
+        try {
+            Usuario usuario = usuarioService.activarUsuario(id);
+            return ResponseEntity.ok(usuario);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ErrorResponse("Error al activar usuario", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("Error interno del servidor", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{id}/desactivar")
+    public ResponseEntity<?> desactivarUsuario(@PathVariable Integer id) {
+        try {
+            Usuario usuario = usuarioService.desactivarUsuario(id);
+            return ResponseEntity.ok(usuario);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ErrorResponse("Error al desactivar usuario", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("Error interno del servidor", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{id}/password")
+    public ResponseEntity<?> cambiarPassword(@PathVariable Integer id,
+                                             @Valid @RequestBody CambiarPasswordRequest request) {
+        try {
+            Usuario usuario = usuarioService.cambiarPassword(id, request.getNuevaPassword());
+            return ResponseEntity.ok(usuario);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ErrorResponse("Datos inválidos", e.getMessage()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ErrorResponse("Error al cambiar contraseña", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("Error interno del servidor", e.getMessage()));
         }
     }
 
