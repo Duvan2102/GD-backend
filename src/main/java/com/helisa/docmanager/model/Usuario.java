@@ -9,8 +9,6 @@ import lombok.Setter;
 
 import java.util.List;
 
-@Getter
-@Setter
 @Data
 @Entity
 @Table(name = "usuarios")
@@ -37,6 +35,16 @@ public class Usuario {
     @ManyToOne
     @JoinColumn(name = "id_cargo")
     private Cargo cargo;
+
+    @NotNull
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "id_estado", nullable = false)
+    private Estado estado;
+
+    @NotNull
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "id_rol", nullable = false)
+    private Rol rol;
 
     private String correoEmpresarial;
     private String correoPersonal;
