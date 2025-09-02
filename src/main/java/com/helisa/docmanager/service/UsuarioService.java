@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import java.security.SecureRandom;
 
 @Service
 @Transactional
@@ -50,7 +51,43 @@ public class UsuarioService {
             throw new RuntimeException("Debe especificar un cargo válido");
         }
 
+        // Generar contraseña aleatoria si no fue proporcionada
+        if (usuario.getPassword() == null || usuario.getPassword().trim().isEmpty()) {
+            usuario.setPassword(generarContrasenaAleatoria(12));
+        }
+
         return usuarioRepository.save(usuario);
+    }
+
+    private String generarContrasenaAleatoria(int longitud) {
+        final String mayus = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        final String minus = "abcdefghijklmnopqrstuvwxyz";
+        final String digitos = "0123456789";
+        final String especiales = "!@#$%^&*()-_=+[]{}";
+        final String todos = mayus + minus + digitos + especiales;
+
+        SecureRandom random = new SecureRandom();
+        StringBuilder sb = new StringBuilder(longitud);
+
+        // Asegurar al menos un carácter de cada tipo
+        sb.append(mayus.charAt(random.nextInt(mayus.length())));
+        sb.append(minus.charAt(random.nextInt(minus.length())));
+        sb.append(digitos.charAt(random.nextInt(digitos.length())));
+        sb.append(especiales.charAt(random.nextInt(especiales.length())));
+
+        for (int i = sb.length(); i < longitud; i++) {
+            sb.append(todos.charAt(random.nextInt(todos.length())));
+        }
+
+        // Mezclar
+        char[] chars = sb.toString().toCharArray();
+        for (int i = chars.length - 1; i > 0; i--) {
+            int j = random.nextInt(i + 1);
+            char tmp = chars[i];
+            chars[i] = chars[j];
+            chars[j] = tmp;
+        }
+        return new String(chars);
     }
 
     /**

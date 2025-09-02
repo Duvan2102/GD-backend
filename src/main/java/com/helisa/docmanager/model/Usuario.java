@@ -59,4 +59,7 @@ public class Usuario {
     @JsonIgnore
     @OneToMany(mappedBy = "usuario")
     private List<Comentario> comentarios;
+
+	private String password;
+
 }
