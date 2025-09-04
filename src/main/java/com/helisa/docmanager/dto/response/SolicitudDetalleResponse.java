@@ -20,6 +20,8 @@ public class SolicitudDetalleResponse {
     private Integer idTipologia;
     private LocalDateTime createdAt;
     private Integer createdBy;
+	private String nombreSolicitud;
+	private String descripcionSolicitud;
     private Boolean ordenFirma;
     private Integer destinatariosTotal;
     private Integer destinatariosAprobados;
