@@ -257,8 +257,8 @@ public class SolicitudService {
                         .build())
                 .collect(Collectors.toList());
 
-		SolicitudHistorial historial = historialRepository
-				.findFirstBySolicitudIdOrderByFechaAccionAsc(solicitud.getId());
+        SolicitudHistorial historial = historialRepository
+                .findFirstBySolicitudIdOrderByFechaAsc(solicitud.getId().longValue());
 
         Long aprobados = destinatarioRepository.countAprobadosBySolicitudId(solicitud.getId());
         Long total = destinatarioRepository.countTotalBySolicitudId(solicitud.getId());
