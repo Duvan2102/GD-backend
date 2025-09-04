@@ -37,4 +37,7 @@ public interface SolicitudHistorialRepository extends JpaRepository<SolicitudHis
     Page<SolicitudHistorial> findByActorUsuarioId(
             @Param("usuarioId") Integer usuarioId,
             Pageable pageable);
+
+	SolicitudHistorial findFirstBySolicitudIdOrderByFechaAccionAsc(Integer solicitudId);
+	
 }

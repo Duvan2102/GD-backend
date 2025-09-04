@@ -257,12 +257,17 @@ public class SolicitudService {
                         .build())
                 .collect(Collectors.toList());
 
+		SolicitudHistorial historial = historialRepository
+				.findFirstBySolicitudIdOrderByFechaAccionAsc(solicitud.getId());
+
         Long aprobados = destinatarioRepository.countAprobadosBySolicitudId(solicitud.getId());
         Long total = destinatarioRepository.countTotalBySolicitudId(solicitud.getId());
 
         return SolicitudDetalleResponse.builder()
                 .id(solicitud.getId())
-                .estado(solicitud.getEstado().getDescripcion()) // Usar descripción del estado
+				.nombreSolicitud(solicitud.getNombreSolicitud())
+                .estado(solicitud.getEstado().getDescripcion())
+				.descripcionSolicitud(historial.getComentario()) 
                 .idTipologia(solicitud.getIdTipologia())
                 .createdAt(solicitud.getCreatedAt())
                 .createdBy(solicitud.getIdSolicitante())
