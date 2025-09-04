@@ -57,30 +57,23 @@ public class SolicitudService {
 
     public SolicitudDetalleResponse crear(CrearSolicitudRequest request) {
         try {
-            // Validaciones
             validarPdfPrincipal(request.getPdfPrincipal());
             if (request.getAdjuntos() != null) {
                 validarAdjuntos(request.getAdjuntos());
             }
 
-            // Obtener el estado PENDIENTE de la BD
             Estado estadoPendiente = estadoRepository.getEstadoPendiente();
 
-            // Crear solicitud
             Solicitud solicitud = new Solicitud();
             solicitud.setIdSolicitante(request.getIdSolicitante());
             solicitud.setIdTipologia(request.getIdTipologia());
             solicitud.setOrdenFirmaBoolean(request.getOrdenFirma());
 
-            // IMPORTANTE: Establecer el estado desde la BD
             solicitud.setEstado(estadoPendiente);
 
-            // Establecer campos opcionales
-            solicitud.setNombreSolicitud("Solicitud de documento - " +
-                    LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+            solicitud.setNombreSolicitud(request.getNombreSolicitud());
             solicitud.setFechaRegistro(LocalDateTime.now());
 
-            // Guardar PDF principal
             String pdfPath = storageService.guardarArchivo(
                     request.getPdfPrincipal(),
                     "pdf_" + System.currentTimeMillis());
@@ -88,21 +81,17 @@ public class SolicitudService {
             solicitud.setPdfOriginalName(request.getPdfPrincipal().getOriginalFilename());
             solicitud.setPdfSizeBytes(request.getPdfPrincipal().getSize());
 
-            // Guardar solicitud
             solicitud = solicitudRepository.save(solicitud);
 
             log.info("Solicitud guardada con ID: {}, Estado: {}",
                     solicitud.getId(), solicitud.getEstado().getDescripcion());
 
-            // Crear destinatarios
             crearDestinatarios(solicitud, request.getDestinatarios());
 
-            // Guardar adjuntos si existen
             if (request.getAdjuntos() != null) {
                 guardarAdjuntos(solicitud, request.getAdjuntos());
             }
 
-            // Crear historial
             crearHistorial(solicitud, request.getIdSolicitante(),
                     SolicitudHistorial.AccionEnum.CREAR,
                     request.getComentarioInicial() != null ?
