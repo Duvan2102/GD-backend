@@ -33,37 +33,37 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
 
-        // final String authHeader = request.getHeader("Authorization");
-        // String username = null;
-        // String jwt = null;
+        final String authHeader = request.getHeader("Authorization");
+        String username = null;
+        String jwt = null;
 
-        // if (authHeader != null && authHeader.startsWith("Bearer ")) {
-        //     jwt = authHeader.substring(7);
-        //     try {
-        //         username = jwtService.extractUsername(jwt);
-        //     } catch (Exception ignored) {
-        //         // Token inválido o expirado: continuamos sin autenticar
-        //     }
-        // }
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            jwt = authHeader.substring(7);
+            try {
+                username = jwtService.extractUsername(jwt);
+            } catch (Exception ignored) {
+                // Token inválido o expirado: continuamos sin autenticar
+            }
+        }
 
-        // if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-        //     // Verificar si el token está revocado
-        //     try {
-        //         String jti = jwtService.extractJti(jwt);
-        //         if (jti != null && revokedTokenRepository.existsByJti(jti)) {
-        //             filterChain.doFilter(request, response);
-        //             return;
-        //         }
-        //     } catch (Exception ignored) {}
+        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            // Verificar si el token está revocado
+            try {
+                String jti = jwtService.extractJti(jwt);
+                if (jti != null && revokedTokenRepository.existsByJti(jti)) {
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+            } catch (Exception ignored) {}
 
-        //     UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-        //     if (jwtService.isTokenValid(jwt, userDetails)) {
-        //         UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-        //                 userDetails, null, userDetails.getAuthorities());
-        //         authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-        //         SecurityContextHolder.getContext().setAuthentication(authToken);
-        //     }
-        // }
+            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+            if (jwtService.isTokenValid(jwt, userDetails)) {
+                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                        userDetails, null, userDetails.getAuthorities());
+                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                SecurityContextHolder.getContext().setAuthentication(authToken);
+            }
+        }
 
         filterChain.doFilter(request, response);
     }
