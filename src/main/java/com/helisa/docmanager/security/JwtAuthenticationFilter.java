@@ -12,7 +12,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-import com.helisa.docmanager.repository.RevokedTokenRepository;
+// import com.helisa.docmanager.repository.RevokedTokenRepository;
 
 import java.io.IOException;
 
@@ -25,8 +25,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Autowired
     private UserDetailsService userDetailsService;
 
-    @Autowired
-    private RevokedTokenRepository revokedTokenRepository;
+    // @Autowired
+    // private RevokedTokenRepository revokedTokenRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -47,14 +47,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            // Verificar si el token está revocado
-            try {
-                String jti = jwtService.extractJti(jwt);
-                if (jti != null && revokedTokenRepository.existsByJti(jti)) {
-                    filterChain.doFilter(request, response);
-                    return;
-                }
-            } catch (Exception ignored) {}
+            // Verificar si el token está revocado - COMENTADO PARA SIMPLIFICAR
+            // try {
+            //     String jti = jwtService.extractJti(jwt);
+            //     if (jti != null && revokedTokenRepository.existsByJti(jti)) {
+            //         filterChain.doFilter(request, response);
+            //         return;
+            //     }
+            // } catch (Exception ignored) {}
 
             UserDetails userDetails = userDetailsService.loadUserByUsername(username);
             if (jwtService.isTokenValid(jwt, userDetails)) {
