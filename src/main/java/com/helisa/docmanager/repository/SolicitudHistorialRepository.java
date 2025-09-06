@@ -40,6 +40,11 @@ public interface SolicitudHistorialRepository extends JpaRepository<SolicitudHis
 
 	SolicitudHistorial findFirstBySolicitudIdOrderByFechaAsc(Long solicitudId);
 
-
+	@Query("""
+        SELECT h FROM SolicitudHistorial h
+        WHERE h.solicitud.id = :solicitudId
+        ORDER BY h.fecha ASC
+        """)
+	List<SolicitudHistorial> findBySolicitudIdOrderByFechaAsc(@Param("solicitudId") Long solicitudId);
 
 }

@@ -31,4 +31,5 @@ public class SolicitudDetalleResponse {
 
     private List<AdjuntoResponse> adjuntos;
     private List<DestinatarioResponse> destinatarios;
+    private List<HistorialResponse> historial;
 }

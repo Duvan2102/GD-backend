@@ -2,6 +2,7 @@ package com.helisa.docmanager.service;
 
 import com.helisa.docmanager.dto.response.AdjuntoResponse;
 import com.helisa.docmanager.dto.response.DestinatarioResponse;
+import com.helisa.docmanager.dto.response.HistorialResponse;
 import com.helisa.docmanager.dto.response.SolicitudDetalleResponse;
 import com.helisa.docmanager.dto.response.SolicitudResumenResponse;
 import com.helisa.docmanager.model.*;
@@ -246,8 +247,20 @@ public class SolicitudService {
                         .build())
                 .collect(Collectors.toList());
 
-        SolicitudHistorial historial = historialRepository
-                .findFirstBySolicitudIdOrderByFechaAsc(solicitud.getId().longValue());
+        List<HistorialResponse> historial = historialRepository
+                .findBySolicitudIdOrderByFechaAsc(solicitud.getId().longValue())
+                .stream()
+                .map(h -> HistorialResponse.builder()
+                        .id(h.getId())
+                        .actorUsuarioId(h.getActorUsuarioId())
+                        .accion(h.getAccion().name())
+                        .comentario(h.getComentario())
+                        .fecha(h.getFecha())
+                        .build())
+                .collect(Collectors.toList());
+
+        // Obtener el comentario inicial del primer registro del historial
+        String descripcionSolicitud = historial.isEmpty() ? null : historial.get(0).getComentario();
 
         Long aprobados = destinatarioRepository.countAprobadosBySolicitudId(solicitud.getId());
         Long total = destinatarioRepository.countTotalBySolicitudId(solicitud.getId());
@@ -256,7 +269,7 @@ public class SolicitudService {
                 .id(solicitud.getId())
 				.nombreSolicitud(solicitud.getNombreSolicitud())
                 .estado(solicitud.getEstado().getDescripcion())
-				.descripcionSolicitud(historial.getComentario()) 
+				.descripcionSolicitud(descripcionSolicitud) 
                 .idTipologia(solicitud.getIdTipologia())
                 .createdAt(solicitud.getCreatedAt())
                 .createdBy(solicitud.getIdSolicitante())
@@ -267,6 +280,7 @@ public class SolicitudService {
                 .pdfSizeBytes(solicitud.getPdfSizeBytes())
                 .adjuntos(adjuntos)
                 .destinatarios(destinatarios)
+                .historial(historial)
                 .build();
     }
 
