@@ -13,38 +13,22 @@ import java.util.List;
 @Repository
 public interface SolicitudHistorialRepository extends JpaRepository<SolicitudHistorial, Long> {
 
-    @Query("""
-        SELECT h FROM SolicitudHistorial h
-        WHERE h.solicitud.id = :solicitudId
-        ORDER BY h.fecha DESC
-        """)
+    @Query("SELECT h FROM SolicitudHistorial h WHERE h.solicitud.id = :solicitudId ORDER BY h.fecha DESC")
     List<SolicitudHistorial> findBySolicitudId(@Param("solicitudId") Integer solicitudId);
 
-    @Query("""
-        SELECT h FROM SolicitudHistorial h
-        WHERE h.solicitud.id = :solicitudId
-        ORDER BY h.fecha DESC
-        """)
+    @Query("SELECT h FROM SolicitudHistorial h WHERE h.solicitud.id = :solicitudId ORDER BY h.fecha DESC")
     Page<SolicitudHistorial> findBySolicitudIdPaged(
             @Param("solicitudId") Integer solicitudId,
             Pageable pageable);
 
-    @Query("""
-        SELECT h FROM SolicitudHistorial h
-        WHERE h.actorUsuarioId = :usuarioId
-        ORDER BY h.fecha DESC
-        """)
+    @Query("SELECT h FROM SolicitudHistorial h WHERE h.actorUsuarioId = :usuarioId ORDER BY h.fecha DESC")
     Page<SolicitudHistorial> findByActorUsuarioId(
             @Param("usuarioId") Integer usuarioId,
             Pageable pageable);
 
 	SolicitudHistorial findFirstBySolicitudIdOrderByFechaAsc(Long solicitudId);
 
-	@Query("""
-        SELECT h FROM SolicitudHistorial h
-        WHERE h.solicitud.id = :solicitudId
-        ORDER BY h.fecha ASC
-        """)
+	@Query("SELECT h FROM SolicitudHistorial h WHERE h.solicitud.id = :solicitudId ORDER BY h.fecha ASC")
 	List<SolicitudHistorial> findBySolicitudIdOrderByFechaAsc(@Param("solicitudId") Long solicitudId);
 
 }

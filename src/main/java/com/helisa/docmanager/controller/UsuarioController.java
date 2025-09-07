@@ -5,6 +5,10 @@ import com.helisa.docmanager.model.CambiarPasswordRequest;
 import com.helisa.docmanager.service.UsuarioService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -35,12 +39,27 @@ public class UsuarioController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Usuario>> obtenerTodosUsuarios() {
+    public ResponseEntity<?> obtenerTodosUsuarios(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "idUsuario") String sortBy,
+            @RequestParam(defaultValue = "asc") String sortDir) {
         try {
-            List<Usuario> usuarios = usuarioService.obtenerTodosUsuarios();
-            return ResponseEntity.ok(usuarios);
+            // Crear objeto de ordenamiento
+            Sort sort = sortDir.equalsIgnoreCase("desc") ? 
+                Sort.by(sortBy).descending() : 
+                Sort.by(sortBy).ascending();
+            
+            // Crear objeto de paginación
+            Pageable pageable = PageRequest.of(page, size, sort);
+            
+            // Obtener usuarios paginados
+            Page<Usuario> usuariosPage = usuarioService.obtenerTodosUsuarios(pageable);
+            
+            return ResponseEntity.ok(usuariosPage);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("Error interno del servidor", e.getMessage()));
         }
     }
 
@@ -143,12 +162,29 @@ public class UsuarioController {
     @PutMapping("/{id}/activar")
     public ResponseEntity<?> activarUsuario(@PathVariable Integer id) {
         try {
+            System.out.println("UsuarioController - Intentando activar usuario con ID: " + id);
+            
+            // Verificar autenticación
+            org.springframework.security.core.Authentication auth = 
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            
+            if (auth == null || !auth.isAuthenticated()) {
+                System.out.println("UsuarioController - Usuario no autenticado");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ErrorResponse("No autorizado", "Usuario no autenticado"));
+            }
+            
+            System.out.println("UsuarioController - Usuario autenticado: " + auth.getName());
+            
             Usuario usuario = usuarioService.activarUsuario(id);
+            System.out.println("UsuarioController - Usuario activado exitosamente: " + usuario.getUsuario());
             return ResponseEntity.ok(usuario);
         } catch (RuntimeException e) {
+            System.out.println("UsuarioController - Error al activar usuario: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(new ErrorResponse("Error al activar usuario", e.getMessage()));
         } catch (Exception e) {
+            System.out.println("UsuarioController - Error interno: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new ErrorResponse("Error interno del servidor", e.getMessage()));
         }

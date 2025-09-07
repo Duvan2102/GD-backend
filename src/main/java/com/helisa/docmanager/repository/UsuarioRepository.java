@@ -1,6 +1,8 @@
 package com.helisa.docmanager.repository;
 
 import com.helisa.docmanager.model.Usuario;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -95,4 +97,11 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Integer> {
      */
     @Query("SELECT COUNT(u) FROM Usuario u WHERE u.cargo.idCargo = :cargoId")
     Long countByCargo(@Param("cargoId") Integer cargoId);
+
+    /**
+     * Obtener todos los usuarios con paginación
+     * @param pageable Parámetros de paginación
+     * @return Página de usuarios
+     */
+    Page<Usuario> findAll(Pageable pageable);
 }
