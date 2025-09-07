@@ -8,6 +8,8 @@ import com.helisa.docmanager.repository.UsuarioRepository;
 import com.helisa.docmanager.repository.EstadoRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -107,6 +109,16 @@ public class UsuarioService {
     @Transactional(readOnly = true)
     public List<Usuario> obtenerTodosUsuarios() {
         return usuarioRepository.findAll();
+    }
+
+    /**
+     * Obtener todos los usuarios con paginación
+     * @param pageable Parámetros de paginación
+     * @return Página de usuarios
+     */
+    @Transactional(readOnly = true)
+    public Page<Usuario> obtenerTodosUsuarios(Pageable pageable) {
+        return usuarioRepository.findAll(pageable);
     }
 
     /**

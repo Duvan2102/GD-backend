@@ -12,25 +12,14 @@ import java.util.Optional;
 @Repository
 public interface SolicitudAdjuntoRepository extends JpaRepository<SolicitudAdjunto, Long> {
 
-    @Query("""
-        SELECT a FROM SolicitudAdjunto a
-        WHERE a.solicitud.id = :solicitudId
-        ORDER BY a.createdAt ASC
-        """)
+    @Query("SELECT a FROM SolicitudAdjunto a WHERE a.solicitud.id = :solicitudId ORDER BY a.createdAt ASC")
     List<SolicitudAdjunto> findBySolicitudId(@Param("solicitudId") Integer solicitudId);
 
-    @Query("""
-        SELECT COUNT(a) FROM SolicitudAdjunto a
-        WHERE a.solicitud.id = :solicitudId
-        """)
+    @Query("SELECT COUNT(a) FROM SolicitudAdjunto a WHERE a.solicitud.id = :solicitudId")
     Long countBySolicitudId(@Param("solicitudId") Integer solicitudId);
 
     // Verificar que el adjunto pertenece a la solicitud
-    @Query("""
-        SELECT a FROM SolicitudAdjunto a
-        WHERE a.id = :adjuntoId
-        AND a.solicitud.id = :solicitudId
-        """)
+    @Query("SELECT a FROM SolicitudAdjunto a WHERE a.id = :adjuntoId AND a.solicitud.id = :solicitudId")
     Optional<SolicitudAdjunto> findByIdAndSolicitudId(
             @Param("adjuntoId") Long adjuntoId,
             @Param("solicitudId") Integer solicitudId);

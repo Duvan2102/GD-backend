@@ -30,37 +30,14 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, Integer> {
             Pageable pageable);
 
     // Solicitudes pendientes para gestionar
-    @Query("""
-        SELECT DISTINCT s FROM Solicitud s
-        JOIN s.destinatariosDetalle d
-        WHERE s.estado.idEstado = 1
-        AND d.usuarioId = :usuarioId
-        AND d.decision = 'PENDIENTE'
-        AND (
-            s.ordenFirmaBoolean = false
-            OR (
-                s.ordenFirmaBoolean = true
-                AND d.ordenIndex = (
-                    SELECT MIN(d2.ordenIndex)
-                    FROM SolicitudDestinatario d2
-                    WHERE d2.solicitud = s
-                    AND d2.decision = 'PENDIENTE'
-                )
-            )
-        )
-        """)
+    @Query("SELECT DISTINCT s FROM Solicitud s JOIN s.destinatariosDetalle d WHERE s.estado.idEstado = 1 AND d.usuarioId = :usuarioId AND d.decision = 'PENDIENTE' AND (s.ordenFirmaBoolean = false OR (s.ordenFirmaBoolean = true AND d.ordenIndex = (SELECT MIN(d2.ordenIndex) FROM SolicitudDestinatario d2 WHERE d2.solicitud = s AND d2.decision = 'PENDIENTE')))")
     Page<Solicitud> findPendientesParaGestionar(
             @Param("usuarioId") Integer usuarioId,
             @Param("ordenSecuencial") boolean ordenSecuencial,
             Pageable pageable);
 
     // Histórico del usuario
-    @Query("""
-        SELECT DISTINCT s FROM Solicitud s
-        JOIN s.destinatariosDetalle d
-        WHERE d.usuarioId = :usuarioId
-        AND s.estado.idEstado IN (2, 3, 4)
-        """)
+    @Query("SELECT DISTINCT s FROM Solicitud s JOIN s.destinatariosDetalle d WHERE d.usuarioId = :usuarioId AND s.estado.idEstado IN (2, 3, 4)")
     Page<Solicitud> findHistoricoUsuario(
             @Param("usuarioId") Integer usuarioId,
             Pageable pageable);
