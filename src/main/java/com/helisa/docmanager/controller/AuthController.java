@@ -7,6 +7,9 @@ import com.helisa.docmanager.model.Tipologia;
 import com.helisa.docmanager.repository.RevokedTokenRepository;
 import com.helisa.docmanager.repository.UsuarioRepository;
 import com.helisa.docmanager.repository.TipologiaRepository;
+import com.helisa.docmanager.service.TwoFactorAuthService;
+import com.helisa.docmanager.service.LoginAttemptService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.Data;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +23,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+
 
 @RestController
 @RequestMapping("/api/auth")
@@ -41,27 +45,59 @@ public class AuthController {
     @Autowired
     private TipologiaRepository tipologiaRepository;
 
+    @Autowired
+    private TwoFactorAuthService twoFactorAuthService;
+
+    @Autowired
+    private LoginAttemptService loginAttemptService;
+
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+        String ipAddress = getClientIpAddress(httpRequest);
+        
         try {
+            // Verificar si el usuario está bloqueado
+            if (loginAttemptService.isUserLocked(request.getUsuario())) {
+                long lockoutTime = loginAttemptService.getLockoutTimeRemaining(request.getUsuario());
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                        .body(new ErrorResponse("USUARIO_BLOQUEADO", 
+                                "Usuario bloqueado. Intenta en " + lockoutTime + " minutos."));
+            }
+
+            // Verificar límite de intentos por hora
+            if (loginAttemptService.hasExceededHourlyLimit(request.getUsuario())) {
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                        .body(new ErrorResponse("LIMITE_EXCEDIDO", 
+                                "Has excedido el límite de intentos por hora."));
+            }
+
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getUsuario(), request.getPassword())
             );
 
             UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-            String token = jwtService.generateToken(userDetails);
-            
-            // Obtener datos completos del usuario
             Usuario usuario = usuarioRepository.findByUsuario(request.getUsuario())
                     .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+            // Registrar login exitoso
+            loginAttemptService.recordSuccessfulLogin(request.getUsuario(), ipAddress);
+
+            // Siempre requerir 2FA después del login exitoso
+            String tempToken = jwtService.generateTempToken(userDetails.getUsername());
+            return ResponseEntity.status(HttpStatus.ACCEPTED)
+                    .body(new TwoFactorRequiredResponse("Se requiere código de verificación", 
+                            usuario.getUsuario(), true, tempToken));
             
-            return ResponseEntity.ok(new AuthResponse(token, usuario, tipologiaRepository));
         } catch (BadCredentialsException e) {
+            loginAttemptService.recordFailedLogin(request.getUsuario(), ipAddress);
+            int remainingAttempts = loginAttemptService.getRemainingAttempts(request.getUsuario());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new ErrorResponse("CREDENCIALES_INVALIDAS", "Usuario o contraseña incorrectos"));
+                    .body(new ErrorResponse("CREDENCIALES_INVALIDAS", 
+                            "Usuario o contraseña incorrectos. Intentos restantes: " + remainingAttempts));
         } catch (Exception e) {
+            loginAttemptService.recordFailedLogin(request.getUsuario(), ipAddress);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new ErrorResponse("ERROR_INTERNO", e.getMessage()));
         }
@@ -94,7 +130,6 @@ public class AuthController {
     @PostMapping("/validate-password")
     public ResponseEntity<?> validatePassword(@Valid @RequestBody PasswordValidationRequest request) {
         try {
-            // Obtener el usuario autenticado desde el contexto de seguridad
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             if (authentication == null || !authentication.isAuthenticated()) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -105,7 +140,6 @@ public class AuthController {
             Usuario usuario = usuarioRepository.findByUsuario(username)
                     .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
-            // Validar la contraseña
             boolean isPasswordValid = passwordEncoder.matches(request.getPassword(), usuario.getPassword());
             
             if (isPasswordValid) {
@@ -124,6 +158,7 @@ public class AuthController {
     public static class LoginRequest {
         private String usuario;
         private String password;
+        private String codigo2FA; // Código de doble autenticación
     }
 
     @Data
@@ -168,7 +203,6 @@ public class AuthController {
                 this.rol = usuario.getRol() != null ? usuario.getRol().getDescripcion() : null;
                 this.estado = usuario.getEstado() != null ? usuario.getEstado().getDescripcion() : null;
                 
-                // Obtener tipologías asociadas al cargo del usuario
                 if (usuario.getCargo() != null) {
                     this.tipologias = tipologiaRepository.findByCargoIdCargo(usuario.getCargo().getIdCargo())
                             .stream()
@@ -233,5 +267,324 @@ public class AuthController {
             this.valid = valid;
             this.message = message;
         }
+    }
+
+    @Data
+    public static class TwoFactorRequiredResponse {
+        private final String message;
+        private final String usuario;
+        private final boolean dobleAutenticacion;
+        private final String tempToken; // Token temporal para validar 2FA
+    }
+
+    @Data
+    public static class TwoFactorSetupResponse {
+        private final String qrCodeUrl;
+        private final String secret;
+        private final String message;
+    }
+
+    // ========== NUEVOS ENDPOINTS PARA DOBLE AUTENTICACIÓN ==========
+
+    /**
+     * Valida el código de doble autenticación y genera JWT final
+     */
+    @PostMapping("/validate-2fa")
+    public ResponseEntity<?> validateTwoFactor(@Valid @RequestBody Validate2FARequest request) {
+        try {
+            // Validar token temporal
+            if (!jwtService.isTempTokenValid(request.getTempToken())) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ErrorResponse("TOKEN_INVALIDO", "Token temporal inválido o expirado"));
+            }
+
+            String username = jwtService.extractUsernameFromTempToken(request.getTempToken());
+            Usuario usuario = usuarioRepository.findByUsuario(username)
+                    .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+            // Validar código 2FA
+            if (!twoFactorAuthService.validateTwoFactorCode(usuario, request.getCodigo2FA())) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ErrorResponse("CODIGO_2FA_INVALIDO", "Código de verificación incorrecto"));
+            }
+
+            // Generar JWT completo
+            UserDetails userDetails = new org.springframework.security.core.userdetails.User(
+                    usuario.getUsuario(), usuario.getPassword(), java.util.Collections.emptyList());
+            String finalToken = jwtService.generateToken(userDetails);
+            
+            return ResponseEntity.ok(new AuthResponse(finalToken, usuario, tipologiaRepository));
+            
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("ERROR_VALIDACION", e.getMessage()));
+        }
+    }
+
+    /**
+     * Envía código de verificación por email
+     */
+    @PostMapping("/send-email-code")
+    public ResponseEntity<?> sendEmailCode(@Valid @RequestBody SendCodeRequest request) {
+        try {
+            Usuario usuario = usuarioRepository.findByUsuario(request.getUsuario())
+                    .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+            if (usuario.getDobleAutenticacion() == null || !usuario.getDobleAutenticacion()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(new ErrorResponse("2FA_DISABLED", "La doble autenticación no está habilitada"));
+            }
+
+            twoFactorAuthService.sendEmailCode(usuario);
+            return ResponseEntity.ok(new MessageResponse("Código enviado por email"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("ERROR_ENVIO", e.getMessage()));
+        }
+    }
+
+    /**
+     * Configura Google Authenticator para un usuario (PRIMERA VEZ)
+     */
+    @PostMapping("/setup-google-auth")
+    public ResponseEntity<?> setupGoogleAuth(@Valid @RequestBody SetupGoogleAuthRequest request) {
+        try {
+            Usuario usuario = usuarioRepository.findByUsuario(request.getUsuario())
+                    .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+            // Verificar si ya tiene 2FA configurado
+            if (usuario.getDobleAutenticacion() != null && usuario.getDobleAutenticacion()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(new ErrorResponse("2FA_YA_CONFIGURADO", "La doble autenticación ya está configurada"));
+            }
+
+            TwoFactorAuthService.TwoFactorSetupResult result = twoFactorAuthService.setupGoogleAuth(usuario);
+            
+            return ResponseEntity.ok(new TwoFactorSetupResponse(result.getQrCodeUrl(), result.getSecret(), 
+                    "Escanea el código QR con Google Authenticator y luego confirma con un código"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("ERROR_SETUP", e.getMessage()));
+        }
+    }
+
+    /**
+     * Confirma la configuración de Google Authenticator con un código
+     */
+    @PostMapping("/confirm-google-auth")
+    public ResponseEntity<?> confirmGoogleAuth(@Valid @RequestBody ConfirmGoogleAuthRequest request) {
+        try {
+            Usuario usuario = usuarioRepository.findByUsuario(request.getUsuario())
+                    .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+            // Validar el código de Google Authenticator
+            if (!twoFactorAuthService.validateGoogleAuthCode(request.getSecret(), Integer.parseInt(request.getCodigo()))) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ErrorResponse("CODIGO_INVALIDO", "Código de Google Authenticator incorrecto"));
+            }
+
+            // Habilitar doble autenticación
+            usuario.setDobleAutenticacion(true);
+            usuarioRepository.save(usuario);
+
+            return ResponseEntity.ok(new MessageResponse("Google Authenticator configurado exitosamente"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("ERROR_CONFIRMACION", e.getMessage()));
+        }
+    }
+
+    /**
+     * Deshabilita la doble autenticación
+     */
+    @PostMapping("/disable-2fa")
+    public ResponseEntity<?> disableTwoFactorAuth(@Valid @RequestBody Disable2FARequest request) {
+        try {
+            Usuario usuario = usuarioRepository.findByUsuario(request.getUsuario())
+                    .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+            // Verificar contraseña actual
+            if (!passwordEncoder.matches(request.getPassword(), usuario.getPassword())) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ErrorResponse("PASSWORD_INCORRECT", "Contraseña incorrecta"));
+            }
+
+            twoFactorAuthService.disableTwoFactorAuth(usuario);
+            usuario.setDobleAutenticacion(false);
+            usuarioRepository.save(usuario);
+
+            return ResponseEntity.ok(new MessageResponse("Doble autenticación deshabilitada"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("ERROR_DISABLE", e.getMessage()));
+        }
+    }
+
+    /**
+     * Obtiene estadísticas de intentos de login
+     */
+    @GetMapping("/login-stats/{usuario}")
+    public ResponseEntity<?> getLoginStats(@PathVariable String usuario) {
+        try {
+            String stats = loginAttemptService.getAttemptStats(usuario);
+            return ResponseEntity.ok(new MessageResponse(stats));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("ERROR_STATS", e.getMessage()));
+        }
+    }
+
+    /**
+     * Desbloquea un usuario manualmente
+     */
+    @PostMapping("/unlock-user/{usuario}")
+    public ResponseEntity<?> unlockUser(@PathVariable String usuario) {
+        try {
+            loginAttemptService.unlockUser(usuario);
+            return ResponseEntity.ok(new MessageResponse("Usuario desbloqueado"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("ERROR_UNLOCK", e.getMessage()));
+        }
+    }
+
+    /**
+     * Obtiene el estado de configuración de 2FA para un usuario
+     */
+    @GetMapping("/2fa-status/{usuario}")
+    @CrossOrigin(origins = "*")
+    public ResponseEntity<?> get2FAStatus(@PathVariable String usuario) {
+        try {
+            Usuario user = usuarioRepository.findByUsuario(usuario)
+                    .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+            
+            boolean hasGoogleAuth = twoFactorAuthService.hasGoogleAuthConfigured(usuario);
+            boolean hasEmailBackup = user.getDobleAutenticacion() != null && user.getDobleAutenticacion();
+            
+            return ResponseEntity.ok(new TwoFactorStatusResponse(
+                hasGoogleAuth, 
+                hasEmailBackup, 
+                "Estado de configuración 2FA"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("ERROR_INTERNO", e.getMessage()));
+        }
+    }
+
+    /**
+     * Obtiene o regenera el código QR para Google Authenticator
+     */
+    @PostMapping("/get-google-auth-qr")
+    public ResponseEntity<?> getGoogleAuthQR(@Valid @RequestBody SetupGoogleAuthRequest request) {
+        try {
+            Usuario usuario = usuarioRepository.findByUsuario(request.getUsuario())
+                    .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+            // Verificar si ya tiene Google Auth configurado
+            if (twoFactorAuthService.hasGoogleAuthConfigured(request.getUsuario())) {
+                // Si ya tiene configurado, devolver el QR existente
+                String existingSecret = twoFactorAuthService.getExistingGoogleAuthSecret(request.getUsuario());
+                String qrCodeUrl = twoFactorAuthService.generateQRCodeUrl(existingSecret, request.getUsuario(), "Helisa");
+                return ResponseEntity.ok(new TwoFactorSetupResponse(qrCodeUrl, existingSecret, 
+                        "Código QR existente para Google Authenticator"));
+            } else {
+                // Si no tiene configurado, generar uno nuevo
+                TwoFactorAuthService.TwoFactorSetupResult result = twoFactorAuthService.setupGoogleAuth(usuario);
+                return ResponseEntity.ok(new TwoFactorSetupResponse(result.getQrCodeUrl(), result.getSecret(), 
+                        "Nuevo código QR para Google Authenticator"));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("ERROR_QR_GENERATION", e.getMessage()));
+        }
+    }
+
+    /**
+     * Desvincula Google Authenticator del usuario
+     */
+    @PostMapping("/remove-google-auth")
+    public ResponseEntity<?> removeGoogleAuth(@Valid @RequestBody RemoveGoogleAuthRequest request) {
+        try {
+            Usuario usuario = usuarioRepository.findByUsuario(request.getUsuario())
+                    .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+            
+            if (!passwordEncoder.matches(request.getPassword(), usuario.getPassword())) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ErrorResponse("PASSWORD_INCORRECT", "Contraseña incorrecta"));
+            }
+            
+            twoFactorAuthService.removeGoogleAuth(request.getUsuario());
+            return ResponseEntity.ok(new MessageResponse("Google Authenticator desvinculado exitosamente"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("ERROR_REMOVE_GOOGLE_AUTH", e.getMessage()));
+        }
+    }
+
+    // ========== CLASES DE REQUEST ==========
+
+    @Data
+    public static class SendCodeRequest {
+        private String usuario;
+    }
+
+    @Data
+    public static class SetupGoogleAuthRequest {
+        private String usuario;
+    }
+
+    @Data
+    public static class Disable2FARequest {
+        private String usuario;
+        private String password;
+    }
+
+    @Data
+    public static class Validate2FARequest {
+        private String tempToken;
+        private String codigo2FA;
+    }
+
+    @Data
+    public static class ConfirmGoogleAuthRequest {
+        private String usuario;
+        private String secret;
+        private String codigo;
+    }
+
+    @Data
+    public static class TwoFactorStatusResponse {
+        private boolean hasGoogleAuth;
+        private boolean hasEmailBackup;
+        private String message;
+        
+        public TwoFactorStatusResponse(boolean hasGoogleAuth, boolean hasEmailBackup, String message) {
+            this.hasGoogleAuth = hasGoogleAuth;
+            this.hasEmailBackup = hasEmailBackup;
+            this.message = message;
+        }
+    }
+
+    @Data
+    public static class RemoveGoogleAuthRequest {
+        private String usuario;
+        private String password;
+    }
+
+    // ========== MÉTODOS AUXILIARES ==========
+
+    private String getClientIpAddress(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+            return xForwardedFor.split(",")[0].trim();
+        }
+        
+        String xRealIp = request.getHeader("X-Real-IP");
+        if (xRealIp != null && !xRealIp.isEmpty()) {
+            return xRealIp;
+        }
+        
+        return request.getRemoteAddr();
     }
 }
