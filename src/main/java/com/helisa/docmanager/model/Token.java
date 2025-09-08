@@ -2,8 +2,10 @@ package com.helisa.docmanager.model;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
+import lombok.Data;
 import java.time.LocalDateTime;
 
+@Data
 @Entity
 @Table(name = "token")
 public class Token {

@@ -21,17 +21,9 @@ public class FlujoAprobacionService {
     @Autowired
     private SolicitudRepository solicitudRepository;
 
-    /**
-     * Verifica si un usuario puede aprobar una solicitud en este momento
-     *
-     * @param solicitudId ID de la solicitud
-     * @param usuarioId ID del usuario
-     * @param ordenFirma true si requiere orden secuencial
-     * @return true si el usuario puede aprobar
-     */
+    
     @Transactional(readOnly = true)
     public boolean puedeAprobar(Integer solicitudId, Integer usuarioId, boolean ordenFirma) {
-        // Verificar que el usuario sea destinatario y esté pendiente
         Optional<SolicitudDestinatario> destinatario =
                 destinatarioRepository.findBySolicitudIdAndUsuarioId(solicitudId, usuarioId);
 
@@ -42,14 +34,12 @@ public class FlujoAprobacionService {
             return false;
         }
 
-        // Si no requiere orden, cualquier pendiente puede aprobar
         if (!ordenFirma) {
             log.debug("Solicitud {} no requiere orden, usuario {} puede aprobar",
                     solicitudId, usuarioId);
             return true;
         }
 
-        // Con orden secuencial, verificar que sea el siguiente
         List<SolicitudDestinatario> pendientes =
                 destinatarioRepository.findPendientesBySolicitudId(solicitudId);
 
@@ -62,12 +52,6 @@ public class FlujoAprobacionService {
         return puedeAprobar;
     }
 
-    /**
-     * Verifica si todos los destinatarios han aprobado
-     *
-     * @param solicitudId ID de la solicitud
-     * @return true si todos aprobaron
-     */
     @Transactional(readOnly = true)
     public boolean todosAprobaron(Integer solicitudId) {
         Long aprobados = destinatarioRepository.countAprobadosBySolicitudId(solicitudId);
@@ -81,12 +65,6 @@ public class FlujoAprobacionService {
         return todoAprobado;
     }
 
-    /**
-     * Obtiene el siguiente aprobador en la cadena
-     *
-     * @param solicitudId ID de la solicitud
-     * @return Siguiente destinatario pendiente o null si no hay
-     */
     @Transactional(readOnly = true)
     public SolicitudDestinatario obtenerSiguienteAprobador(Integer solicitudId) {
         List<SolicitudDestinatario> pendientes =
@@ -104,16 +82,8 @@ public class FlujoAprobacionService {
         return siguiente;
     }
 
-    /**
-     * Verifica si un usuario puede rechazar una solicitud
-     *
-     * @param solicitudId ID de la solicitud
-     * @param usuarioId ID del usuario
-     * @return true si puede rechazar
-     */
     @Transactional(readOnly = true)
     public boolean puedeRechazar(Integer solicitudId, Integer usuarioId) {
-        // Cualquier destinatario pendiente puede rechazar
         Optional<SolicitudDestinatario> destinatario =
                 destinatarioRepository.findBySolicitudIdAndUsuarioId(solicitudId, usuarioId);
 
@@ -126,25 +96,16 @@ public class FlujoAprobacionService {
         return puedeRechazar;
     }
 
-    /**
-     * Verifica si un usuario puede cancelar una solicitud
-     *
-     * @param solicitudId ID de la solicitud
-     * @param usuarioId ID del usuario
-     * @return true si puede cancelar
-     */
     @Transactional(readOnly = true)
     public boolean puedeCancelar(Integer solicitudId, Integer usuarioId) {
         return solicitudRepository.findById(solicitudId)
                 .map(solicitud -> {
-                    // El creador siempre puede cancelar
                     if (solicitud.getIdSolicitante().equals(usuarioId)) {
                         log.debug("Usuario {} es creador, puede cancelar solicitud {}",
                                 usuarioId, solicitudId);
                         return true;
                     }
 
-                    // Los destinatarios también pueden cancelar
                     boolean esDestinatario = destinatarioRepository
                             .findBySolicitudIdAndUsuarioId(solicitudId, usuarioId)
                             .isPresent();
@@ -158,12 +119,6 @@ public class FlujoAprobacionService {
                 .orElse(false);
     }
 
-    /**
-     * Obtiene información del progreso de aprobación
-     *
-     * @param solicitudId ID de la solicitud
-     * @return Objeto con información del progreso
-     */
     @Transactional(readOnly = true)
     public ProgresoAprobacion obtenerProgreso(Integer solicitudId) {
         Long aprobados = destinatarioRepository.countAprobadosBySolicitudId(solicitudId);
@@ -181,9 +136,6 @@ public class FlujoAprobacionService {
                 .build();
     }
 
-    /**
-     * Clase para representar el progreso de aprobación
-     */
     @lombok.Data
     @lombok.Builder
     public static class ProgresoAprobacion {

@@ -50,4 +50,44 @@ public class JwtService {
         DecodedJWT decoded = JWT.require(Algorithm.HMAC256(jwtSecret)).build().verify(token);
         return decoded.getExpiresAt().toInstant();
     }
+
+    /**
+     * Genera un token temporal para validación de 2FA (válido por 5 minutos)
+     */
+    public String generateTempToken(String username) {
+        Instant now = Instant.now();
+        Algorithm algorithm = Algorithm.HMAC256(jwtSecret);
+        return JWT.create()
+                .withSubject(username)
+                .withClaim("type", "temp_2fa")
+                .withJWTId(UUID.randomUUID().toString())
+                .withIssuedAt(Date.from(now))
+                .withExpiresAt(Date.from(now.plusMillis(300000))) // 5 minutos
+                .sign(algorithm);
+    }
+
+    /**
+     * Valida si un token temporal es válido
+     */
+    public boolean isTempTokenValid(String token) {
+        try {
+            DecodedJWT decoded = JWT.require(Algorithm.HMAC256(jwtSecret)).build().verify(token);
+            return "temp_2fa".equals(decoded.getClaim("type").asString()) && 
+                   decoded.getExpiresAt().after(new Date());
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Extrae el username de un token temporal
+     */
+    public String extractUsernameFromTempToken(String token) {
+        try {
+            DecodedJWT decoded = JWT.require(Algorithm.HMAC256(jwtSecret)).build().verify(token);
+            return decoded.getSubject();
+        } catch (Exception e) {
+            throw new RuntimeException("Token temporal inválido", e);
+        }
+    }
 }
