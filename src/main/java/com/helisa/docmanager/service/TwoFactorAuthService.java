@@ -27,6 +27,7 @@ public class TwoFactorAuthService {
     public static final String TIPO_GOOGLE_AUTH = "GOOGLE_AUTH";
     public static final String TIPO_EMAIL_CODE = "EMAIL_CODE";
     public static final String TIPO_GOOGLE_AUTH_SECRET = "GOOGLE_AUTH_SECRET";
+    public static final String TIPO_GOOGLE_AUTH_PENDING = "GOOGLE_AUTH_PENDING";
 
     // Duración de validez de tokens (en minutos)
     private static final int TOKEN_VALIDITY_MINUTES = 10;
@@ -133,6 +134,15 @@ public class TwoFactorAuthService {
             tokenRepository.save(token);
         }
         
+        // Crear token pendiente para indicar que necesita confirmación
+        Token pendingToken = new Token();
+        pendingToken.setUsuario(usuario);
+        pendingToken.setCodigo("PENDING");
+        pendingToken.setTipoValidacion(TIPO_GOOGLE_AUTH_PENDING);
+        pendingToken.setFechaExp(LocalDateTime.now().plusDays(7)); // Válido por 7 días
+        
+        tokenRepository.save(pendingToken);
+        
         String qrCodeUrl = generateQRCodeUrl(secret, usuario.getUsuario(), "Helisa");
         return new TwoFactorSetupResult(qrCodeUrl, secret);
     }
@@ -238,5 +248,34 @@ public class TwoFactorAuthService {
      */
     public void removeGoogleAuth(String usuario) {
         tokenRepository.deleteByUsuarioAndTipo(usuario, TIPO_GOOGLE_AUTH_SECRET);
+        tokenRepository.deleteByUsuarioAndTipo(usuario, TIPO_GOOGLE_AUTH_PENDING);
+    }
+
+    /**
+     * Elimina solo el token pendiente de Google Authenticator
+     */
+    public void removePendingGoogleAuth(String usuario) {
+        tokenRepository.deleteByUsuarioAndTipo(usuario, TIPO_GOOGLE_AUTH_PENDING);
+    }
+
+    /**
+     * Verifica si un usuario tiene Google Authenticator configurado y confirmado
+     */
+    public boolean isGoogleAuthConfirmed(String usuario) {
+        LocalDateTime now = LocalDateTime.now();
+        var googleSecret = tokenRepository.findValidTokenByUsuarioAndTipo(usuario, TIPO_GOOGLE_AUTH_SECRET, now);
+        var pendingToken = tokenRepository.findValidTokenByUsuarioAndTipo(usuario, TIPO_GOOGLE_AUTH_PENDING, now);
+        
+        // Si tiene secreto pero también tiene token pendiente, no está confirmado
+        if (googleSecret.isPresent() && pendingToken.isPresent()) {
+            return false;
+        }
+        
+        // Si tiene secreto y no tiene token pendiente, está confirmado
+        if (googleSecret.isPresent() && !pendingToken.isPresent()) {
+            return true;
+        }
+        
+        return false;
     }
 }

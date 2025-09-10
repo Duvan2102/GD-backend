@@ -25,20 +25,7 @@ public class EmailService {
             message.setTo(toEmail);
             message.setSubject(subjectPrefix + " Código de Verificación");
             
-            String body = String.format("""
-                Hola %s,
-                
-                Has solicitado un código de verificación para acceder a tu cuenta.
-                
-                Tu código de verificación es: %s
-                
-                Este código expirará en 10 minutos.
-                
-                Si no solicitaste este código, por favor ignora este mensaje.
-                
-                Saludos,
-                Equipo Helisa
-                """, nombreUsuario, codigo);
+            String body = String.format("hola %s, tu código de verificación es: %s", nombreUsuario, codigo);
             
             message.setText(body);
             
@@ -57,17 +44,7 @@ public class EmailService {
             message.setTo(toEmail);
             message.setSubject(subjectPrefix + " Alerta de Intento de Inicio de Sesión");
             
-            String body = String.format("""
-                Hola %s,
-                
-                Se ha detectado un intento de inicio de sesión en tu cuenta desde la IP: %s
-                
-                Si fuiste tú, puedes ignorar este mensaje.
-                Si no fuiste tú, por favor cambia tu contraseña inmediatamente.
-                
-                Saludos,
-                Equipo Helisa
-                """, nombreUsuario, ipAddress);
+            String body = String.format("hola %s, se ha detectado un intento de inicio de sesión en tu cuenta desde la IP: %s", nombreUsuario, ipAddress);
             
             message.setText(body);
             

@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -28,6 +29,8 @@ public interface TokenRepository extends JpaRepository<Token, Integer> {
                                                   @Param("now") LocalDateTime now);
     
     // Eliminar tokens expirados
+    @Modifying
+    @Transactional
     @Query("DELETE FROM Token t WHERE t.fechaExp < :now")
     void deleteExpiredTokens(@Param("now") LocalDateTime now);
     
@@ -50,6 +53,7 @@ public interface TokenRepository extends JpaRepository<Token, Integer> {
      * Elimina tokens por usuario y tipo
      */
     @Modifying
+    @Transactional
     @Query("DELETE FROM Token t WHERE t.usuario.usuario = :usuario AND t.tipoValidacion = :tipo")
     void deleteByUsuarioAndTipo(@Param("usuario") String usuario, @Param("tipo") String tipo);
 }
