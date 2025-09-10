@@ -33,7 +33,11 @@ public class EmailService {
             System.out.println("Email enviado exitosamente a: " + toEmail);
         } catch (Exception e) {
             System.err.println("Error enviando email: " + e.getMessage());
-            throw new RuntimeException("Error enviando código de verificación", e);
+            System.err.println("Tipo de error: " + e.getClass().getSimpleName());
+            if (e.getCause() != null) {
+                System.err.println("Causa: " + e.getCause().getMessage());
+            }
+            throw new RuntimeException("Error enviando código de verificación: " + e.getMessage(), e);
         }
     }
 
