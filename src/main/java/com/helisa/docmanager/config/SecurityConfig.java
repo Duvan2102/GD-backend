@@ -35,6 +35,10 @@ public class SecurityConfig {
                 .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/admin/usuarios/pendientes").authenticated()
+                        .requestMatchers("/api/admin/usuarios/*/activar").authenticated()
+                        .requestMatchers("/api/admin/usuarios/*/rechazar").authenticated()
+                        .requestMatchers("/api/admin/usuarios/*/estado-pendiente").authenticated()
                         .requestMatchers("OPTIONS", "/**").permitAll()
                         .anyRequest().authenticated()
                 )

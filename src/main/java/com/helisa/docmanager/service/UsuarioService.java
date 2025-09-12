@@ -6,6 +6,7 @@ import com.helisa.docmanager.model.Estado;
 import com.helisa.docmanager.repository.CargoRepository;
 import com.helisa.docmanager.repository.UsuarioRepository;
 import com.helisa.docmanager.repository.EstadoRepository;
+import com.helisa.docmanager.repository.RolRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -30,6 +31,9 @@ public class UsuarioService {
 
     @Autowired
     private EstadoRepository estadoRepository;
+
+    @Autowired
+    private RolRepository rolRepository;
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
     /**
@@ -270,5 +274,18 @@ public class UsuarioService {
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado con ID: " + id));
         usuario.setPassword(passwordEncoder.encode(nuevaPassword));
         return usuarioRepository.save(usuario);
+    }
+
+    // Métodos getter para los repositorios (necesarios para el registro)
+    public CargoRepository getCargoRepository() {
+        return cargoRepository;
+    }
+
+    public EstadoRepository getEstadoRepository() {
+        return estadoRepository;
+    }
+
+    public RolRepository getRolRepository() {
+        return rolRepository;
     }
 }

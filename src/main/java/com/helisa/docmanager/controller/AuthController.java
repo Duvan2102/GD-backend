@@ -9,6 +9,7 @@ import com.helisa.docmanager.repository.UsuarioRepository;
 import com.helisa.docmanager.repository.TipologiaRepository;
 import com.helisa.docmanager.service.TwoFactorAuthService;
 import com.helisa.docmanager.service.LoginAttemptService;
+import com.helisa.docmanager.service.UsuarioService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.Data;
@@ -50,6 +51,9 @@ public class AuthController {
 
     @Autowired
     private LoginAttemptService loginAttemptService;
+
+    @Autowired
+    private UsuarioService usuarioService;
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
@@ -100,6 +104,74 @@ public class AuthController {
             loginAttemptService.recordFailedLogin(request.getUsuario(), ipAddress);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new ErrorResponse("ERROR_INTERNO", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
+        try {
+            // Validar que el usuario no exista
+            if (usuarioRepository.existsByUsuario(request.getUsuario())) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(new ErrorResponse("USUARIO_EXISTE", "El nombre de usuario ya existe"));
+            }
+
+            // Validar que la identificación no exista
+            if (usuarioRepository.existsByIdentificacion(request.getIdentificacion())) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(new ErrorResponse("IDENTIFICACION_EXISTE", "Ya existe un usuario con esta identificación"));
+            }
+
+            // Validar que el correo no exista
+            if (request.getCorreoEmpresarial() != null && 
+                usuarioRepository.findByCorreoEmpresarial(request.getCorreoEmpresarial()).isPresent()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(new ErrorResponse("CORREO_EXISTE", "Ya existe un usuario con este correo empresarial"));
+            }
+
+            // Crear nuevo usuario
+            Usuario nuevoUsuario = new Usuario();
+            nuevoUsuario.setIdentificacion(request.getIdentificacion());
+            nuevoUsuario.setNombres(request.getNombres());
+            nuevoUsuario.setApellidos(request.getApellidos());
+            nuevoUsuario.setUsuario(request.getUsuario());
+            nuevoUsuario.setPassword(request.getPassword());
+            nuevoUsuario.setCorreoEmpresarial(request.getCorreoEmpresarial());
+            nuevoUsuario.setCorreoPersonal(request.getCorreoPersonal());
+            nuevoUsuario.setTelefono1(request.getTelefono1());
+            nuevoUsuario.setTelefono2(request.getTelefono2());
+            nuevoUsuario.setDireccion(request.getDireccion());
+            nuevoUsuario.setDobleAutenticacion(false);
+
+            // Establecer cargo por defecto (necesitamos un cargo por defecto)
+            // Por ahora usaremos el primer cargo disponible, pero esto debería ser configurable
+            com.helisa.docmanager.repository.CargoRepository cargoRepository = usuarioService.getCargoRepository();
+            com.helisa.docmanager.model.Cargo cargoDefault = cargoRepository.findAll().stream().findFirst()
+                    .orElseThrow(() -> new RuntimeException("No hay cargos disponibles en el sistema"));
+            nuevoUsuario.setCargo(cargoDefault);
+
+            // Establecer rol por defecto (necesitamos un rol por defecto)
+            com.helisa.docmanager.repository.RolRepository rolRepository = usuarioService.getRolRepository();
+            com.helisa.docmanager.model.Rol rolDefault = rolRepository.findAll().stream().findFirst()
+                    .orElseThrow(() -> new RuntimeException("No hay roles disponibles en el sistema"));
+            nuevoUsuario.setRol(rolDefault);
+
+            // Establecer estado PENDIENTE
+            com.helisa.docmanager.repository.EstadoRepository estadoRepository = usuarioService.getEstadoRepository();
+            com.helisa.docmanager.model.Estado estadoPendiente = estadoRepository.findByDescripcion("PENDIENTE")
+                    .orElseThrow(() -> new RuntimeException("Estado PENDIENTE no encontrado en la base de datos"));
+            nuevoUsuario.setEstado(estadoPendiente);
+
+            // Crear usuario usando el servicio
+            Usuario usuarioCreado = usuarioService.crearUsuario(nuevoUsuario);
+
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(new RegisterResponse("Usuario registrado exitosamente. Debe ser activado por un administrador.", 
+                            usuarioCreado.getIdUsuario()));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("ERROR_REGISTRO", e.getMessage()));
         }
     }
 
@@ -474,7 +546,7 @@ public class AuthController {
             
             boolean hasGoogleAuth = twoFactorAuthService.hasGoogleAuthConfigured(usuario);
             boolean isGoogleAuthConfirmed = twoFactorAuthService.isGoogleAuthConfirmed(usuario);
-            boolean hasEmailBackup = user.getDobleAutenticacion() != null && user.getDobleAutenticacion();
+            boolean hasEmailBackup = user.getDobleAutenticacion() == null || !user.getDobleAutenticacion();
             
             // Si tiene Google Auth configurado pero no confirmado, considerarlo como configurado
             boolean googleAuthConfigured = hasGoogleAuth && isGoogleAuthConfirmed;
@@ -691,6 +763,31 @@ public class AuthController {
     public static class Change2FAMethodRequest {
         private Integer idUsuario;
         private String nuevoMetodo;
+    }
+
+    @Data
+    public static class RegisterRequest {
+        private String identificacion;
+        private String nombres;
+        private String apellidos;
+        private String usuario;
+        private String password;
+        private String correoEmpresarial;
+        private String correoPersonal;
+        private String telefono1;
+        private String telefono2;
+        private String direccion;
+    }
+
+    @Data
+    public static class RegisterResponse {
+        private final String message;
+        private final Integer idUsuario;
+        
+        public RegisterResponse(String message, Integer idUsuario) {
+            this.message = message;
+            this.idUsuario = idUsuario;
+        }
     }
 
     // ========== MÉTODOS AUXILIARES ==========

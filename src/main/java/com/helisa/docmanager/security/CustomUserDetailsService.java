@@ -25,8 +25,9 @@ public class CustomUserDetailsService implements UserDetailsService {
         Usuario usuario = usuarioRepository.findByUsuario(username)
                 .orElseThrow(() -> new UsernameNotFoundException("Usuario no encontrado: " + username));
 
-        boolean enabled = usuario.getEstado() == null ||
-                (usuario.getEstado().getDescripcion() != null && !usuario.getEstado().getDescripcion().equalsIgnoreCase("INACTIVO"));
+        boolean enabled = usuario.getEstado() != null &&
+                !usuario.getEstado().getDescripcion().equalsIgnoreCase("INACTIVO") &&
+                !usuario.getEstado().getDescripcion().equalsIgnoreCase("PENDIENTE");
 
         Collection<? extends GrantedAuthority> authorities = mapAuthorities(usuario);
 

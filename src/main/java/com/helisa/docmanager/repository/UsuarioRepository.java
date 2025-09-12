@@ -104,4 +104,11 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Integer> {
      * @return Página de usuarios
      */
     Page<Usuario> findAll(Pageable pageable);
+
+    /**
+     * Buscar usuarios por estado
+     * @param estado Estado del usuario
+     * @return Lista de usuarios con el estado especificado
+     */
+    List<Usuario> findByEstado(com.helisa.docmanager.model.Estado estado);
 }
