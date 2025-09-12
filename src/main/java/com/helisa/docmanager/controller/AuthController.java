@@ -552,7 +552,7 @@ public class AuthController {
             log.info("Usuario encontrado - ID: {}, Nombre: {} {}, dobleAutenticacion: {}", 
                     user.getIdUsuario(), user.getNombres(), user.getApellidos(), user.getDobleAutenticacion());
             
-            boolean hasGoogleAuth = twoFactorAuthService.hasGoogleAuthConfigured(usuario);
+            boolean hasGoogleAuth = user.getDobleAutenticacion();
             log.info("hasGoogleAuth: {}", hasGoogleAuth);
             
             boolean isGoogleAuthConfirmed = twoFactorAuthService.isGoogleAuthConfirmed(usuario);
