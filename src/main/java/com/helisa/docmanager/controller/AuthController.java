@@ -24,9 +24,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import lombok.extern.slf4j.Slf4j;
 
 
 @RestController
+@Slf4j
 @RequestMapping("/api/auth")
 @CrossOrigin(origins = "*")
 public class AuthController {
@@ -541,24 +543,50 @@ public class AuthController {
     @CrossOrigin(origins = "*")
     public ResponseEntity<?> get2FAStatus(@PathVariable String usuario) {
         try {
+            log.info("=== INICIO VERIFICACIÓN 2FA STATUS ===");
+            log.info("Usuario consultado: {}", usuario);
+            
             Usuario user = usuarioRepository.findByUsuario(usuario)
                     .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
             
+            log.info("Usuario encontrado - ID: {}, Nombre: {} {}, dobleAutenticacion: {}", 
+                    user.getIdUsuario(), user.getNombres(), user.getApellidos(), user.getDobleAutenticacion());
+            
             boolean hasGoogleAuth = twoFactorAuthService.hasGoogleAuthConfigured(usuario);
+            log.info("hasGoogleAuth: {}", hasGoogleAuth);
+            
             boolean isGoogleAuthConfirmed = twoFactorAuthService.isGoogleAuthConfirmed(usuario);
+            log.info("isGoogleAuthConfirmed: {}", isGoogleAuthConfirmed);
+            
             boolean hasEmailBackup = user.getDobleAutenticacion() == null || !user.getDobleAutenticacion();
+            log.info("hasEmailBackup (dobleAutenticacion null o false): {} - dobleAutenticacion value: {}", 
+                    hasEmailBackup, user.getDobleAutenticacion());
             
             // Si tiene Google Auth configurado pero no confirmado, considerarlo como configurado
             boolean googleAuthConfigured = hasGoogleAuth && isGoogleAuthConfirmed;
             boolean googleAuthPending = hasGoogleAuth && !isGoogleAuthConfirmed;
             
-            return ResponseEntity.ok(new TwoFactorStatusResponse(
+            log.info("googleAuthConfigured: {} (hasGoogleAuth: {} && isGoogleAuthConfirmed: {})", 
+                    googleAuthConfigured, hasGoogleAuth, isGoogleAuthConfirmed);
+            log.info("googleAuthPending: {} (hasGoogleAuth: {} && !isGoogleAuthConfirmed: {})", 
+                    googleAuthPending, hasGoogleAuth, !isGoogleAuthConfirmed);
+            
+            TwoFactorStatusResponse response = new TwoFactorStatusResponse(
                 googleAuthConfigured, 
                 hasEmailBackup,
                 googleAuthPending,
                 "Estado de configuración 2FA"
-            ));
+            );
+            
+            log.info("=== RESPUESTA FINAL ===");
+            log.info("googleAuthConfigured: {}", response.isGoogleAuthConfigured());
+            log.info("hasEmailBackup: {}", response.isHasEmailBackup());
+            log.info("googleAuthPending: {}", response.isGoogleAuthPending());
+            log.info("=== FIN VERIFICACIÓN 2FA STATUS ===");
+            
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
+            log.error("Error al obtener estado 2FA para usuario: {}", usuario, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new ErrorResponse("ERROR_INTERNO", e.getMessage()));
         }
@@ -740,13 +768,13 @@ public class AuthController {
 
     @Data
     public static class TwoFactorStatusResponse {
-        private boolean hasGoogleAuth;
+        private boolean googleAuthConfigured;
         private boolean hasEmailBackup;
         private boolean googleAuthPending;
         private String message;
         
-        public TwoFactorStatusResponse(boolean hasGoogleAuth, boolean hasEmailBackup, boolean googleAuthPending, String message) {
-            this.hasGoogleAuth = hasGoogleAuth;
+        public TwoFactorStatusResponse(boolean googleAuthConfigured, boolean hasEmailBackup, boolean googleAuthPending, String message) {
+            this.googleAuthConfigured = googleAuthConfigured;
             this.hasEmailBackup = hasEmailBackup;
             this.googleAuthPending = googleAuthPending;
             this.message = message;
