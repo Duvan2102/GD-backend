@@ -90,6 +90,39 @@ public class EmailService {
     }
 
     /**
+     * Envía código de verificación de dos factores por email
+     * @param email Email del usuario
+     * @param codigo Código de verificación
+     * @param nombreCompleto Nombre completo del usuario
+     */
+    public void sendTwoFactorCode(String email, String codigo, String nombreCompleto) {
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(fromEmail);
+            message.setTo(email);
+            message.setSubject("Código de Verificación - Helisa Document Manager");
+            
+            String body = String.format(
+                "Hola %s,\n\n" +
+                "Su código de verificación de dos factores es:\n\n" +
+                "%s\n\n" +
+                "Este código expirará en 10 minutos.\n\n" +
+                "Si no solicitó este código, por favor ignore este correo.\n\n" +
+                "Saludos,\n" +
+                "Equipo Helisa",
+                nombreCompleto,
+                codigo
+            );
+            
+            message.setText(body);
+            mailSender.send(message);
+            
+        } catch (Exception e) {
+            throw new RuntimeException("Error al enviar código de verificación: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Genera un token simple para restablecimiento de contraseña
      * En un entorno de producción, esto debería ser más seguro
      * @param usuario Usuario para el cual generar el token
@@ -100,4 +133,42 @@ public class EmailService {
         long timestamp = System.currentTimeMillis();
         return String.format("%d_%d", usuario.getIdUsuario(), timestamp);
     }
+
+	/**
+ * Envía alerta de intentos de login sospechosos
+ * @param email Email del usuario
+ * @param nombreCompleto Nombre completo del usuario
+ * @param ipAddress Dirección IP desde donde se intentó el login
+ */
+public void sendLoginAttemptAlert(String email, String nombreCompleto, String ipAddress) {
+    try {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(fromEmail);
+        message.setTo(email);
+        message.setSubject("Alerta de Seguridad - Intentos de Login Sospechosos");
+        
+        String body = String.format(
+            "Hola %s,\n\n" +
+            "Hemos detectado múltiples intentos de login fallidos en su cuenta.\n\n" +
+            "Detalles del intento:\n" +
+            "- IP: %s\n" +
+            "- Fecha: %s\n\n" +
+            "Si no fue usted quien intentó acceder, por favor:\n" +
+            "1. Cambie su contraseña inmediatamente\n" +
+            "2. Revise la seguridad de su cuenta\n" +
+            "3. Contacte al administrador del sistema\n\n" +
+            "Saludos,\n" +
+            "Equipo de Seguridad Helisa",
+            nombreCompleto,
+            ipAddress,
+            java.time.LocalDateTime.now().toString()
+        );
+        
+        message.setText(body);
+        mailSender.send(message);
+        
+    } catch (Exception e) {
+        throw new RuntimeException("Error al enviar alerta de login: " + e.getMessage(), e);
+    }
+}
 }
