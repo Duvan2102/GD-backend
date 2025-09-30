@@ -4,6 +4,7 @@ import com.helisa.docmanager.model.Cargo;
 import com.helisa.docmanager.model.Tipologia;
 import com.helisa.docmanager.repository.CargoRepository;
 import com.helisa.docmanager.repository.TipologiaRepository;
+import com.helisa.docmanager.util.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -29,8 +30,15 @@ public class TipologiaService {
             throw new RuntimeException("El cargo especificado no existe");
         }
 
-        if (tipologiaRepository.existsByDescripcionAndCargo(tipologia.getDescripcion(), cargo.get())) {
-            throw new RuntimeException("Ya existe una tipología con la descripción '" + tipologia.getDescripcion() + "' en este cargo");
+        // Validar que no exista una tipología con descripción similar en el mismo cargo (ignorando acentos y mayúsculas)
+        String descripcionNormalizada = StringUtils.normalizeForComparison(tipologia.getDescripcion());
+        List<Tipologia> tipologiasExistentes = tipologiaRepository.findByCargo(cargo.get());
+        
+        for (Tipologia t : tipologiasExistentes) {
+            String descripcionExistenteNormalizada = StringUtils.normalizeForComparison(t.getDescripcion());
+            if (descripcionNormalizada.equals(descripcionExistenteNormalizada)) {
+                throw new RuntimeException("Ya existe una tipología con la descripción '" + tipologia.getDescripcion() + "' en este cargo");
+            }
         }
 
         tipologia.setCargo(cargo.get());
@@ -90,11 +98,20 @@ public class TipologiaService {
                             throw new RuntimeException("El cargo especificado no existe");
                         }
 
-                        if (!tipologia.getDescripcion().equals(tipologiaActualizada.getDescripcion()) ||
+                        // Validar que no exista otra tipología con descripción similar en el mismo cargo (ignorando acentos y mayúsculas)
+                        if (!StringUtils.equalsNormalized(tipologia.getDescripcion(), tipologiaActualizada.getDescripcion()) ||
                                 !tipologia.getCargo().getIdCargo().equals(tipologiaActualizada.getCargo().getIdCargo())) {
 
-                            if (tipologiaRepository.existsByDescripcionAndCargo(tipologiaActualizada.getDescripcion(), cargo.get())) {
-                                throw new RuntimeException("Ya existe una tipología con la descripción '" + tipologiaActualizada.getDescripcion() + "' en este cargo");
+                            String descripcionNormalizada = StringUtils.normalizeForComparison(tipologiaActualizada.getDescripcion());
+                            List<Tipologia> tipologiasExistentes = tipologiaRepository.findByCargo(cargo.get());
+                            
+                            for (Tipologia t : tipologiasExistentes) {
+                                if (!t.getIdTipologia().equals(id)) {
+                                    String descripcionExistenteNormalizada = StringUtils.normalizeForComparison(t.getDescripcion());
+                                    if (descripcionNormalizada.equals(descripcionExistenteNormalizada)) {
+                                        throw new RuntimeException("Ya existe una tipología con la descripción '" + tipologiaActualizada.getDescripcion() + "' en este cargo");
+                                    }
+                                }
                             }
                         }
 

@@ -4,6 +4,7 @@ import com.helisa.docmanager.model.Area;
 import com.helisa.docmanager.model.Departamento;
 import com.helisa.docmanager.repository.AreaRepository;
 import com.helisa.docmanager.repository.DepartamentoRepository;
+import com.helisa.docmanager.util.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -29,10 +30,16 @@ public class AreaService {
             throw new RuntimeException("El departamento especificado no existe");
         }
 
-        if (areaRepository.existsByDescripcionAndDepartamento(area.getDescripcion(), departamento.get())) {
-            throw new RuntimeException("Ya existe un área con la descripción '" + area.getDescripcion() + "' en este departamento");
+        // Validar que no exista un área con descripción similar en el mismo departamento (ignorando acentos y mayúsculas)
+        String descripcionNormalizada = StringUtils.normalizeForComparison(area.getDescripcion());
+        List<Area> areasExistentes = areaRepository.findByDepartamento(departamento.get());
+        
+        for (Area a : areasExistentes) {
+            String descripcionExistenteNormalizada = StringUtils.normalizeForComparison(a.getDescripcion());
+            if (descripcionNormalizada.equals(descripcionExistenteNormalizada)) {
+                throw new RuntimeException("Ya existe un área con la descripción '" + area.getDescripcion() + "' en este departamento");
+            }
         }
-
 
         area.setDepartamento(departamento.get());
         return areaRepository.save(area);
@@ -71,11 +78,20 @@ public class AreaService {
                             throw new RuntimeException("El departamento especificado no existe");
                         }
 
-                        if (!area.getDescripcion().equals(areaActualizada.getDescripcion()) ||
+                        // Validar que no exista otra área con descripción similar en el mismo departamento (ignorando acentos y mayúsculas)
+                        if (!StringUtils.equalsNormalized(area.getDescripcion(), areaActualizada.getDescripcion()) ||
                                 !area.getDepartamento().getIdDepartamento().equals(areaActualizada.getDepartamento().getIdDepartamento())) {
 
-                            if (areaRepository.existsByDescripcionAndDepartamento(areaActualizada.getDescripcion(), departamento.get())) {
-                                throw new RuntimeException("Ya existe un área con la descripción '" + areaActualizada.getDescripcion() + "' en este departamento");
+                            String descripcionNormalizada = StringUtils.normalizeForComparison(areaActualizada.getDescripcion());
+                            List<Area> areasExistentes = areaRepository.findByDepartamento(departamento.get());
+                            
+                            for (Area a : areasExistentes) {
+                                if (!a.getIdArea().equals(id)) {
+                                    String descripcionExistenteNormalizada = StringUtils.normalizeForComparison(a.getDescripcion());
+                                    if (descripcionNormalizada.equals(descripcionExistenteNormalizada)) {
+                                        throw new RuntimeException("Ya existe un área con la descripción '" + areaActualizada.getDescripcion() + "' en este departamento");
+                                    }
+                                }
                             }
                         }
 

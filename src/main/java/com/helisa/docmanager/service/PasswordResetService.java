@@ -122,6 +122,34 @@ public class PasswordResetService {
     }
 
     /**
+     * Genera un token para activación de usuario pendiente
+     * Similar a solicitarRestablecimiento pero usando el ID del usuario
+     * Usado cuando se activa un usuario pendiente para que cree su contraseña
+     * 
+     * @param idUsuario ID del usuario
+     * @return Token generado
+     */
+    @Transactional
+    public String generarTokenParaActivacion(Integer idUsuario) {
+        Optional<Usuario> usuarioOpt = usuarioRepository.findById(idUsuario);
+        
+        if (usuarioOpt.isEmpty()) {
+            throw new RuntimeException("Usuario no encontrado con ID: " + idUsuario);
+        }
+
+        Usuario usuario = usuarioOpt.get();
+        
+        // Generar token de restablecimiento con expiración de 24 horas para activación
+        String token = generarTokenSeguro();
+        long expirationTime = System.currentTimeMillis() + (24 * 60 * 60 * 1000); // 24 horas
+        
+        // Guardar token
+        resetTokens.put(token, new TokenInfo(usuario.getIdUsuario(), expirationTime));
+        
+        return token;
+    }
+
+    /**
      * Genera un token seguro para restablecimiento
      * @return Token generado
      */

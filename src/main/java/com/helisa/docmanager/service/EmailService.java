@@ -20,9 +20,83 @@ public class EmailService {
     private String fromEmail;
 
     /**
+     * Envía correo de activación con token para que el usuario cree su contraseña
+     * Usado para usuarios PENDIENTES que están siendo activados por primera vez
+     * @param usuario Usuario que fue activado
+     * @param token Token de restablecimiento de contraseña
+     */
+    public void enviarCorreoActivacionConToken(Usuario usuario, String token) {
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(fromEmail);
+            message.setTo(usuario.getCorreoEmpresarial());
+            message.setSubject("Cuenta Activada - Helisa Document Manager");
+            
+            String body = String.format(
+                "Hola %s %s,\n\n" +
+                "Su cuenta ha sido activada exitosamente en el sistema Helisa Document Manager.\n\n" +
+                "Para completar la configuración de su cuenta, debe establecer una contraseña.\n" +
+                "Haga clic en el siguiente enlace para crear su contraseña:\n\n" +
+                "%s/reset-password?token=%s\n\n" +
+                "Este enlace expirará en 24 horas.\n\n" +
+                "Usuario: %s\n\n" +
+                "Si no solicitó esta activación, por favor contacte al administrador del sistema.\n\n" +
+                "Saludos,\n" +
+                "Equipo Helisa",
+                usuario.getNombres(),
+                usuario.getApellidos(),
+                frontendUrl,
+                token,
+                usuario.getUsuario()
+            );
+            
+            message.setText(body);
+            mailSender.send(message);
+            
+        } catch (Exception e) {
+            throw new RuntimeException("Error al enviar correo de activación: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Envía correo de reactivación para usuarios INACTIVOS
+     * @param usuario Usuario que fue reactivado
+     */
+    public void enviarCorreoReactivacion(Usuario usuario) {
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(fromEmail);
+            message.setTo(usuario.getCorreoEmpresarial());
+            message.setSubject("Cuenta Reactivada - Helisa Document Manager");
+            
+            String body = String.format(
+                "Hola %s %s,\n\n" +
+                "Su cuenta ha sido reactivada exitosamente en el sistema Helisa Document Manager.\n\n" +
+                "Ahora puede acceder nuevamente al sistema con sus credenciales anteriores.\n\n" +
+                "Usuario: %s\n\n" +
+                "Si desea cambiar su contraseña, puede hacerlo desde la opción de restablecer contraseña en la página de inicio de sesión.\n\n" +
+                "Si no solicitó esta reactivación, por favor contacte al administrador del sistema inmediatamente.\n\n" +
+                "Saludos,\n" +
+                "Equipo Helisa",
+                usuario.getNombres(),
+                usuario.getApellidos(),
+                usuario.getUsuario()
+            );
+            
+            message.setText(body);
+            mailSender.send(message);
+            
+        } catch (Exception e) {
+            throw new RuntimeException("Error al enviar correo de reactivación: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * @deprecated Usar enviarCorreoActivacionConToken en su lugar
      * Envía correo de activación con URL para restablecer contraseña
      * @param usuario Usuario que fue activado
      */
+    @Deprecated
     public void enviarCorreoActivacion(Usuario usuario) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();

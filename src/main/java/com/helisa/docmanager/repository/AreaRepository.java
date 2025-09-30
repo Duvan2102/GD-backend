@@ -21,7 +21,7 @@ public interface AreaRepository extends JpaRepository<Area, Integer> {
     boolean existsByDescripcion(String descripcion);
 
     boolean existsByDescripcionAndDepartamento(String descripcion, Departamento departamento);
-
+    
     List<Area> findByDepartamento(Departamento departamento);
 
     List<Area> findByDepartamentoIdDepartamento(Integer idDepartamento);

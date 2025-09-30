@@ -24,8 +24,15 @@ public class UsuarioActivationService {
     @Autowired
     private EmailService emailService;
 
+    @Autowired
+    private PasswordResetService passwordResetService;
+
     /**
-     * Activa un usuario pendiente
+     * Activa un usuario pendiente o inactivo
+     * - Si el usuario está PENDIENTE: genera un token de restablecimiento de contraseña
+     *   para que el usuario cree su propia contraseña al activarse
+     * - Si el usuario está INACTIVO: simplemente lo reactiva sin cambiar la contraseña
+     * 
      * @param idUsuario ID del usuario a activar
      * @return Usuario activado
      */
@@ -34,9 +41,14 @@ public class UsuarioActivationService {
         Usuario usuario = usuarioRepository.findById(idUsuario)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado con ID: " + idUsuario));
 
-        if (!usuario.getEstado().getDescripcion().equalsIgnoreCase("PENDIENTE")) {
-            throw new IllegalStateException("El usuario no está en estado PENDIENTE");
+        String estadoActual = usuario.getEstado().getDescripcion().toUpperCase();
+        
+        // Validar que el usuario esté en estado PENDIENTE o INACTIVO
+        if (!estadoActual.equals("PENDIENTE") && !estadoActual.equals("INACTIVO")) {
+            throw new IllegalStateException("El usuario debe estar en estado PENDIENTE o INACTIVO para ser activado. Estado actual: " + estadoActual);
         }
+
+        boolean esPendiente = estadoActual.equals("PENDIENTE");
 
         // Cambiar estado a ACTIVO
         Estado estadoActivo = estadoRepository.findByDescripcion("ACTIVO")
@@ -45,10 +57,17 @@ public class UsuarioActivationService {
         usuario.setEstado(estadoActivo);
         Usuario usuarioActivado = usuarioRepository.save(usuario);
 
-        // Enviar correo de activación con URL para restablecer contraseña
+        // Si el usuario tiene correo, enviar notificación
         if (usuario.getCorreoEmpresarial() != null && !usuario.getCorreoEmpresarial().trim().isEmpty()) {
             try {
-                emailService.enviarCorreoActivacion(usuario);
+                if (esPendiente) {
+                    // Para usuarios PENDIENTES: generar token y enviar correo para crear contraseña
+                    String token = passwordResetService.generarTokenParaActivacion(usuario.getIdUsuario());
+                    emailService.enviarCorreoActivacionConToken(usuario, token);
+                } else {
+                    // Para usuarios INACTIVOS: solo notificar la reactivación
+                    emailService.enviarCorreoReactivacion(usuario);
+                }
             } catch (Exception e) {
                 // Log el error pero no fallar la activación
                 System.err.println("Error al enviar correo de activación: " + e.getMessage());

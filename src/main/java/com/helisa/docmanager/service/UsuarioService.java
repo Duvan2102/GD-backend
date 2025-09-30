@@ -36,24 +36,23 @@ public class UsuarioService {
     private RolRepository rolRepository;
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-    /**
-     * Crear un nuevo usuario
-     * @param usuario Usuario a crear
-     * @return Usuario creado
-     */
+
     @Transactional
     public Usuario crearUsuario(Usuario usuario) {
-        // Validar que el usuario no exista
         if (usuarioRepository.existsByUsuario(usuario.getUsuario())) {
             throw new RuntimeException("El usuario ya existe: " + usuario.getUsuario());
         }
 
-        // Validar que la identificación no exista
         if (usuarioRepository.existsByIdentificacion(usuario.getIdentificacion())) {
             throw new RuntimeException("Ya existe un usuario con esta identificación: " + usuario.getIdentificacion());
         }
 
-        // Cargar el cargo completo desde la base de datos
+        if (usuario.getCorreoEmpresarial() != null && !usuario.getCorreoEmpresarial().trim().isEmpty()) {
+            if (usuarioRepository.existsByCorreoEmpresarial(usuario.getCorreoEmpresarial())) {
+                throw new RuntimeException("Ya existe un usuario con este correo corporativo: " + usuario.getCorreoEmpresarial());
+            }
+        }
+
         if (usuario.getCargo() != null && usuario.getCargo().getIdCargo() != null) {
             Optional<Cargo> cargoOpt = cargoRepository.findById(usuario.getCargo().getIdCargo());
             if (cargoOpt.isPresent()) {
@@ -65,11 +64,9 @@ public class UsuarioService {
             throw new RuntimeException("Debe especificar un cargo válido");
         }
 
-        // Generar contraseña aleatoria si no fue proporcionada
         if (usuario.getPassword() == null || usuario.getPassword().trim().isEmpty()) {
             usuario.setPassword(generarContrasenaAleatoria(12));
         }
-        // Hash de contraseña
         usuario.setPassword(passwordEncoder.encode(usuario.getPassword()));
 
         return usuarioRepository.save(usuario);
@@ -85,7 +82,6 @@ public class UsuarioService {
         SecureRandom random = new SecureRandom();
         StringBuilder sb = new StringBuilder(longitud);
 
-        // Asegurar al menos un carácter de cada tipo
         sb.append(mayus.charAt(random.nextInt(mayus.length())));
         sb.append(minus.charAt(random.nextInt(minus.length())));
         sb.append(digitos.charAt(random.nextInt(digitos.length())));
@@ -95,7 +91,6 @@ public class UsuarioService {
             sb.append(todos.charAt(random.nextInt(todos.length())));
         }
 
-        // Mezclar
         char[] chars = sb.toString().toCharArray();
         for (int i = chars.length - 1; i > 0; i--) {
             int j = random.nextInt(i + 1);
@@ -106,50 +101,26 @@ public class UsuarioService {
         return new String(chars);
     }
 
-    /**
-     * Obtener todos los usuarios
-     * @return Lista de usuarios
-     */
     @Transactional(readOnly = true)
     public List<Usuario> obtenerTodosUsuarios() {
         return usuarioRepository.findAll();
     }
 
-    /**
-     * Obtener todos los usuarios con paginación
-     * @param pageable Parámetros de paginación
-     * @return Página de usuarios
-     */
     @Transactional(readOnly = true)
     public Page<Usuario> obtenerTodosUsuarios(Pageable pageable) {
         return usuarioRepository.findAll(pageable);
     }
 
-    /**
-     * Obtener usuario por ID
-     * @param id ID del usuario
-     * @return Usuario encontrado
-     */
     @Transactional(readOnly = true)
     public Optional<Usuario> obtenerUsuarioPorId(Integer id) {
         return usuarioRepository.findById(id);
     }
 
-    /**
-     * Obtener usuario por nombre de usuario
-     * @param usuario Nombre de usuario
-     * @return Usuario encontrado
-     */
     @Transactional(readOnly = true)
     public Optional<Usuario> obtenerUsuarioPorNombreUsuario(String usuario) {
         return usuarioRepository.findByUsuario(usuario);
     }
 
-    /**
-     * Obtener usuario por identificación
-     * @param identificacion Identificación del usuario
-     * @return Usuario encontrado
-     */
     @Transactional(readOnly = true)
     public Optional<Usuario> obtenerUsuarioPorIdentificacion(String identificacion) {
         return usuarioRepository.findByIdentificacion(identificacion);
@@ -165,25 +136,30 @@ public class UsuarioService {
 
         Usuario usuario = usuarioExistente.get();
 
-        // Validar si el nuevo nombre de usuario ya existe (excepto para el mismo usuario)
         if (!usuario.getUsuario().equals(usuarioActualizado.getUsuario()) &&
                 usuarioRepository.existsByUsuario(usuarioActualizado.getUsuario())) {
             throw new RuntimeException("El usuario ya existe: " + usuarioActualizado.getUsuario());
         }
 
-        // Validar si la nueva identificación ya existe (excepto para el mismo usuario)
         if (!usuario.getIdentificacion().equals(usuarioActualizado.getIdentificacion()) &&
                 usuarioRepository.existsByIdentificacion(usuarioActualizado.getIdentificacion())) {
             throw new RuntimeException("Ya existe un usuario con esta identificación: " + usuarioActualizado.getIdentificacion());
         }
 
-        // Actualizar campos
+        if (usuarioActualizado.getCorreoEmpresarial() != null && !usuarioActualizado.getCorreoEmpresarial().trim().isEmpty()) {
+            boolean correoActualDiferente = usuario.getCorreoEmpresarial() == null || 
+                    !usuario.getCorreoEmpresarial().equals(usuarioActualizado.getCorreoEmpresarial());
+            
+            if (correoActualDiferente && usuarioRepository.existsByCorreoEmpresarial(usuarioActualizado.getCorreoEmpresarial())) {
+                throw new RuntimeException("Ya existe un usuario con este correo corporativo: " + usuarioActualizado.getCorreoEmpresarial());
+            }
+        }
+
         usuario.setIdentificacion(usuarioActualizado.getIdentificacion());
         usuario.setNombres(usuarioActualizado.getNombres());
         usuario.setApellidos(usuarioActualizado.getApellidos());
         usuario.setUsuario(usuarioActualizado.getUsuario());
 
-        // Cargar el cargo completo desde la base de datos
         if (usuarioActualizado.getCargo() != null && usuarioActualizado.getCargo().getIdCargo() != null) {
             Optional<Cargo> cargoOpt = cargoRepository.findById(usuarioActualizado.getCargo().getIdCargo());
             if (cargoOpt.isPresent()) {
@@ -203,10 +179,6 @@ public class UsuarioService {
         return usuarioRepository.save(usuario);
     }
 
-    /**
-     * Eliminar usuario por ID
-     * @param id ID del usuario a eliminar
-     */
     public void eliminarUsuario(Integer id) {
         if (!usuarioRepository.existsById(id)) {
             throw new RuntimeException("Usuario no encontrado con ID: " + id);
@@ -214,37 +186,21 @@ public class UsuarioService {
         usuarioRepository.deleteById(id);
     }
 
-    /**
-     * Verificar si existe un usuario por ID
-     * @param id ID del usuario
-     * @return true si existe, false si no
-     */
     @Transactional(readOnly = true)
     public boolean existeUsuario(Integer id) {
         return usuarioRepository.existsById(id);
     }
 
-    /**
-     * Buscar usuarios por nombre o apellido
-     * @param termino Término de búsqueda
-     * @return Lista de usuarios encontrados
-     */
     @Transactional(readOnly = true)
     public List<Usuario> buscarUsuariosPorNombreOApellido(String termino) {
         return usuarioRepository.findByNombresContainingIgnoreCaseOrApellidosContainingIgnoreCase(termino, termino);
     }
 
-    /**
-     * Obtener usuarios por cargo
-     * @param cargoId ID del cargo
-     * @return Lista de usuarios con el cargo especificado
-     */
     @Transactional(readOnly = true)
     public List<Usuario> obtenerUsuariosPorCargo(Integer cargoId) {
         return usuarioRepository.findByCargo_IdCargo(cargoId);
     }
 
-    // ===== Nuevas operaciones =====
     @Transactional
     public Usuario activarUsuario(Integer id) {
         Usuario usuario = usuarioRepository.findById(id)
@@ -276,7 +232,6 @@ public class UsuarioService {
         return usuarioRepository.save(usuario);
     }
 
-    // Métodos getter para los repositorios (necesarios para el registro)
     public CargoRepository getCargoRepository() {
         return cargoRepository;
     }
