@@ -6,9 +6,12 @@ import com.helisa.docmanager.repository.TokenRepository;
 import com.warrenstrange.googleauth.GoogleAuthenticator;
 import com.warrenstrange.googleauth.GoogleAuthenticatorKey;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Random;
 
 @Service
@@ -29,9 +32,12 @@ public class TwoFactorAuthService {
     public static final String TIPO_GOOGLE_AUTH_SECRET = "GOOGLE_AUTH_SECRET";
     public static final String TIPO_GOOGLE_AUTH_PENDING = "GOOGLE_AUTH_PENDING";
 
-    // Duración de validez de tokens (en minutos)
-    private static final int TOKEN_VALIDITY_MINUTES = 10;
-    private static final int MAX_ATTEMPTS_PER_HOUR = 5;
+    // Configuración desde properties
+    @Value("${app.2fa.email-code.validity-minutes:5}")
+    private int emailCodeValidityMinutes;
+    
+    @Value("${app.2fa.max-attempts-per-hour:5}")
+    private int maxAttemptsPerHour;
 
     /**
      * Genera un código de 6 dígitos para envío por email
@@ -66,32 +72,77 @@ public class TwoFactorAuthService {
 
     /**
      * Valida un código de email
+     * - Solo valida el código más reciente del usuario
+     * - Elimina el código después de validarlo exitosamente
+     * - No permite reutilizar el mismo código
      */
+    @Transactional
     public boolean validateEmailCode(String codigo, Usuario usuario) {
         LocalDateTime now = LocalDateTime.now();
-        return tokenRepository.findValidTokenByCodigoAndTipo(codigo, TIPO_EMAIL_CODE, now)
-                .map(token -> token.getUsuario().getIdUsuario().equals(usuario.getIdUsuario()))
-                .orElse(false);
+        
+        // Buscar el token por código y tipo
+        var tokenOpt = tokenRepository.findValidTokenByCodigoAndTipo(codigo, TIPO_EMAIL_CODE, now);
+        
+        if (tokenOpt.isEmpty()) {
+            return false; // Código no encontrado o expirado
+        }
+        
+        Token token = tokenOpt.get();
+        
+        // Verificar que el token pertenece al usuario correcto
+        if (!token.getUsuario().getIdUsuario().equals(usuario.getIdUsuario())) {
+            return false; // El código no pertenece a este usuario
+        }
+        
+        // Verificar que es el código más reciente del usuario
+        // (prevenir uso de códigos antiguos que aún no han expirado)
+        var tokensUsuario = tokenRepository.findValidTokensByUsuarioAndTipoOrderByFechaExpDesc(
+            usuario, TIPO_EMAIL_CODE, now);
+        
+        if (!tokensUsuario.isEmpty() && !tokensUsuario.get(0).getIdToken().equals(token.getIdToken())) {
+            // Existe un código más reciente, este ya no es válido
+            return false;
+        }
+        
+        // Código válido - eliminarlo inmediatamente para prevenir reutilización
+        tokenRepository.delete(token);
+        
+        return true;
     }
 
     /**
      * Envía código de verificación por email
+     * - Invalida todos los códigos anteriores del usuario
+     * - Genera un nuevo código con tiempo de vida configurable
+     * - Solo el último código generado será válido
      */
+    @Transactional
     public Token sendEmailCode(Usuario usuario) {
         // Verificar límite de intentos
         if (hasExceededAttemptLimit(usuario, TIPO_EMAIL_CODE)) {
             throw new RuntimeException("Has excedido el límite de intentos. Intenta más tarde.");
         }
 
-        // Generar código
+        // IMPORTANTE: Invalidar/eliminar todos los códigos de email anteriores del usuario
+        // Solo debe existir UN código válido a la vez
+        LocalDateTime now = LocalDateTime.now();
+        List<Token> tokensPrevios = tokenRepository.findValidTokensByUsuarioAndTipoOrderByFechaExpDesc(
+            usuario, TIPO_EMAIL_CODE, now);
+        
+        if (!tokensPrevios.isEmpty()) {
+            // Eliminar códigos anteriores para que no se puedan usar
+            tokenRepository.deleteAll(tokensPrevios);
+        }
+
+        // Generar nuevo código
         String codigo = generateEmailCode();
         
-        // Crear token
+        // Crear token con tiempo de vida configurable
         Token token = new Token();
         token.setUsuario(usuario);
         token.setCodigo(codigo);
         token.setTipoValidacion(TIPO_EMAIL_CODE);
-        token.setFechaExp(LocalDateTime.now().plusMinutes(TOKEN_VALIDITY_MINUTES));
+        token.setFechaExp(LocalDateTime.now().plusMinutes(emailCodeValidityMinutes));
         
         // Guardar token
         token = tokenRepository.save(token);
@@ -196,11 +247,12 @@ public class TwoFactorAuthService {
 
     /**
      * Verifica si el usuario ha excedido el límite de intentos
+     * Usa el valor configurable desde properties
      */
     private boolean hasExceededAttemptLimit(Usuario usuario, String tipo) {
         LocalDateTime oneHourAgo = LocalDateTime.now().minusHours(1);
         Long attempts = tokenRepository.countTokensByUsuarioAndTipoSince(usuario, tipo, oneHourAgo);
-        return attempts >= MAX_ATTEMPTS_PER_HOUR;
+        return attempts >= maxAttemptsPerHour;
     }
 
     /**

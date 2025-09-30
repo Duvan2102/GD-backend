@@ -16,11 +16,17 @@ import java.util.Optional;
 @Repository
 public interface TokenRepository extends JpaRepository<Token, Integer> {
     
-    // Buscar token válido por usuario y tipo
+    // Buscar token válido por usuario y tipo (el más reciente)
     @Query("SELECT t FROM Token t WHERE t.usuario = :usuario AND t.tipoValidacion = :tipo AND t.fechaExp > :now ORDER BY t.fechaExp DESC")
     Optional<Token> findValidTokenByUsuarioAndTipo(@Param("usuario") Usuario usuario, 
                                                    @Param("tipo") String tipo, 
                                                    @Param("now") LocalDateTime now);
+    
+    // Buscar todos los tokens válidos por usuario y tipo ordenados por fecha de expiración descendente
+    @Query("SELECT t FROM Token t WHERE t.usuario = :usuario AND t.tipoValidacion = :tipo AND t.fechaExp > :now ORDER BY t.fechaExp DESC")
+    List<Token> findValidTokensByUsuarioAndTipoOrderByFechaExpDesc(@Param("usuario") Usuario usuario, 
+                                                                    @Param("tipo") String tipo, 
+                                                                    @Param("now") LocalDateTime now);
     
     // Buscar token por código y tipo
     @Query("SELECT t FROM Token t WHERE t.codigo = :codigo AND t.tipoValidacion = :tipo AND t.fechaExp > :now")
