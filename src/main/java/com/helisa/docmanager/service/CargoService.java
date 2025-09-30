@@ -4,6 +4,7 @@ import com.helisa.docmanager.model.Area;
 import com.helisa.docmanager.model.Cargo;
 import com.helisa.docmanager.repository.AreaRepository;
 import com.helisa.docmanager.repository.CargoRepository;
+import com.helisa.docmanager.util.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -29,8 +30,15 @@ public class CargoService {
             throw new RuntimeException("El área especificada no existe");
         }
 
-        if (cargoRepository.existsByDescripcionAndArea(cargo.getDescripcion(), area.get())) {
-            throw new RuntimeException("Ya existe un cargo con la descripción '" + cargo.getDescripcion() + "' en esta área");
+        // Validar que no exista un cargo con descripción similar en la misma área (ignorando acentos y mayúsculas)
+        String descripcionNormalizada = StringUtils.normalizeForComparison(cargo.getDescripcion());
+        List<Cargo> cargosExistentes = cargoRepository.findByArea(area.get());
+        
+        for (Cargo c : cargosExistentes) {
+            String descripcionExistenteNormalizada = StringUtils.normalizeForComparison(c.getDescripcion());
+            if (descripcionNormalizada.equals(descripcionExistenteNormalizada)) {
+                throw new RuntimeException("Ya existe un cargo con la descripción '" + cargo.getDescripcion() + "' en esta área");
+            }
         }
 
         cargo.setArea(area.get());
@@ -82,11 +90,20 @@ public class CargoService {
                             throw new RuntimeException("El área especificada no existe");
                         }
 
-                        if (!cargo.getDescripcion().equals(cargoActualizado.getDescripcion()) ||
+                        // Validar que no exista otro cargo con descripción similar en la misma área (ignorando acentos y mayúsculas)
+                        if (!StringUtils.equalsNormalized(cargo.getDescripcion(), cargoActualizado.getDescripcion()) ||
                                 !cargo.getArea().getIdArea().equals(cargoActualizado.getArea().getIdArea())) {
 
-                            if (cargoRepository.existsByDescripcionAndArea(cargoActualizado.getDescripcion(), area.get())) {
-                                throw new RuntimeException("Ya existe un cargo con la descripción '" + cargoActualizado.getDescripcion() + "' en esta área");
+                            String descripcionNormalizada = StringUtils.normalizeForComparison(cargoActualizado.getDescripcion());
+                            List<Cargo> cargosExistentes = cargoRepository.findByArea(area.get());
+                            
+                            for (Cargo c : cargosExistentes) {
+                                if (!c.getIdCargo().equals(id)) {
+                                    String descripcionExistenteNormalizada = StringUtils.normalizeForComparison(c.getDescripcion());
+                                    if (descripcionNormalizada.equals(descripcionExistenteNormalizada)) {
+                                        throw new RuntimeException("Ya existe un cargo con la descripción '" + cargoActualizado.getDescripcion() + "' en esta área");
+                                    }
+                                }
                             }
                         }
 

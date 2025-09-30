@@ -16,12 +16,12 @@ public interface TipologiaRepository extends JpaRepository<Tipologia, Integer> {
     Optional<Tipologia> findByDescripcion(String descripcion);
 
     @Query("SELECT t FROM Tipologia t WHERE LOWER(t.descripcion) LIKE LOWER(CONCAT('%', :descripcion, '%'))")
-
     List<Tipologia> findByDescripcionContainingIgnoreCase(@Param("descripcion") String descripcion);
+    
     boolean existsByDescripcion(String descripcion);
 
     boolean existsByDescripcionAndCargo(String descripcion, Cargo cargo);
-
+    
     List<Tipologia> findByCargo(Cargo cargo);
 
     List<Tipologia> findByCargoIdCargo(Integer idCargo);

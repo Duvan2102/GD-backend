@@ -33,7 +33,9 @@ public class UsuarioActivationController {
     }
 
     /**
-     * Activa un usuario pendiente
+     * Activa un usuario pendiente o inactivo
+     * - Si está PENDIENTE: se le enviará un correo para que cree su contraseña
+     * - Si está INACTIVO: se le enviará un correo notificando su reactivación
      * @param idUsuario ID del usuario a activar
      * @return Usuario activado
      */
@@ -41,7 +43,13 @@ public class UsuarioActivationController {
     public ResponseEntity<?> activarUsuario(@PathVariable Integer idUsuario) {
         try {
             Usuario usuarioActivado = usuarioActivationService.activarUsuario(idUsuario);
-            return ResponseEntity.ok(new ActivationResponse("Usuario activado exitosamente", usuarioActivado));
+            
+            String mensaje = "Usuario activado exitosamente";
+            if (usuarioActivado.getCorreoEmpresarial() != null && !usuarioActivado.getCorreoEmpresarial().trim().isEmpty()) {
+                mensaje += ". Se ha enviado un correo electrónico con las instrucciones";
+            }
+            
+            return ResponseEntity.ok(new ActivationResponse(mensaje, usuarioActivado));
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(new ErrorResponse("ESTADO_INVALIDO", e.getMessage()));

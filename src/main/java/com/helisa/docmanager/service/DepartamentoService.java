@@ -2,6 +2,7 @@ package com.helisa.docmanager.service;
 
 import com.helisa.docmanager.model.Departamento;
 import com.helisa.docmanager.repository.DepartamentoRepository;
+import com.helisa.docmanager.util.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -15,9 +16,17 @@ public class DepartamentoService {
     private DepartamentoRepository departamentoRepository;
 
     public Departamento crearDepartamento(Departamento departamento) {
-        if (departamentoRepository.existsByDescripcion(departamento.getDescripcion())) {
-            throw new RuntimeException("Ya existe un departamento con la descripción: " + departamento.getDescripcion());
+        // Validar que no exista un departamento con descripción similar (ignorando acentos y mayúsculas)
+        String descripcionNormalizada = StringUtils.normalizeForComparison(departamento.getDescripcion());
+        List<Departamento> departamentos = departamentoRepository.findAll();
+        
+        for (Departamento d : departamentos) {
+            String descripcionExistenteNormalizada = StringUtils.normalizeForComparison(d.getDescripcion());
+            if (descripcionNormalizada.equals(descripcionExistenteNormalizada)) {
+                throw new RuntimeException("Ya existe un departamento con la descripción: " + departamento.getDescripcion());
+            }
         }
+        
         return departamentoRepository.save(departamento);
     }
 
@@ -40,9 +49,19 @@ public class DepartamentoService {
     public Departamento actualizarDepartamento(Integer id, Departamento departamentoActualizado) {
         return departamentoRepository.findById(id)
                 .map(departamento -> {
-                    if (!departamento.getDescripcion().equals(departamentoActualizado.getDescripcion()) &&
-                            departamentoRepository.existsByDescripcion(departamentoActualizado.getDescripcion())) {
-                        throw new RuntimeException("Ya existe un departamento con la descripción: " + departamentoActualizado.getDescripcion());
+                    // Validar que no exista otro departamento con descripción similar (ignorando acentos y mayúsculas)
+                    if (!StringUtils.equalsNormalized(departamento.getDescripcion(), departamentoActualizado.getDescripcion())) {
+                        String descripcionNormalizada = StringUtils.normalizeForComparison(departamentoActualizado.getDescripcion());
+                        List<Departamento> departamentos = departamentoRepository.findAll();
+                        
+                        for (Departamento d : departamentos) {
+                            if (!d.getIdDepartamento().equals(id)) {
+                                String descripcionExistenteNormalizada = StringUtils.normalizeForComparison(d.getDescripcion());
+                                if (descripcionNormalizada.equals(descripcionExistenteNormalizada)) {
+                                    throw new RuntimeException("Ya existe un departamento con la descripción: " + departamentoActualizado.getDescripcion());
+                                }
+                            }
+                        }
                     }
 
                     departamento.setDescripcion(departamentoActualizado.getDescripcion());

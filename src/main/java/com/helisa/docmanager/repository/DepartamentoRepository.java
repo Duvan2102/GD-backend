@@ -18,6 +18,8 @@ public interface DepartamentoRepository extends JpaRepository<Departamento, Inte
     List<Departamento> findByDescripcionContainingIgnoreCase(@Param("descripcion") String descripcion);
 
     boolean existsByDescripcion(String descripcion);
+    
+    List<Departamento> findAll();
 
     List<Departamento> findAllByOrderByDescripcionAsc();
 }

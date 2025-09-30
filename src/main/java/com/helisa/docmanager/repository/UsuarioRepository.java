@@ -67,6 +67,13 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Integer> {
     Optional<Usuario> findByCorreoEmpresarial(String correoEmpresarial);
 
     /**
+     * Verificar si existe un usuario por correo empresarial
+     * @param correoEmpresarial Correo empresarial
+     * @return true si existe, false si no
+     */
+    boolean existsByCorreoEmpresarial(String correoEmpresarial);
+
+    /**
      * Buscar usuarios por correo personal
      * @param correoPersonal Correo personal
      * @return Optional con el usuario encontrado

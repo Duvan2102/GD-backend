@@ -21,7 +21,7 @@ public interface CargoRepository extends JpaRepository<Cargo, Integer> {
     boolean existsByDescripcion(String descripcion);
 
     boolean existsByDescripcionAndArea(String descripcion, Area area);
-
+    
     List<Cargo> findByArea(Area area);
 
     List<Cargo> findByAreaIdArea(Integer idArea);
