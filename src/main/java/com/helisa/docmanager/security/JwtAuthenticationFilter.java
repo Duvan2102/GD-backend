@@ -12,7 +12,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-import com.helisa.docmanager.repository.RevokedTokenRepository;
+import com.helisa.docmanager.repository.TokenRepository;
 
 import java.io.IOException;
 
@@ -26,7 +26,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private UserDetailsService userDetailsService;
 
     @Autowired
-    private RevokedTokenRepository revokedTokenRepository;
+    private TokenRepository tokenRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -46,11 +46,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             jwt = authHeader.substring(7);
             try {
+                // Verificar si el token está expirado antes de procesarlo
+                if (jwtService.isTokenExpired(jwt)) {
+                    System.out.println("JWT Filter - Token expirado");
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"error\":\"Token expirado\",\"message\":\"Su sesión ha expirado. Por favor, inicie sesión nuevamente.\"}");
+                    return;
+                }
+                
                 username = jwtService.extractUsername(jwt);
                 System.out.println("JWT Filter - Username extraído: " + username);
             } catch (Exception e) {
-                System.out.println("JWT Filter - Error al extraer username: " + e.getMessage());
-                // Token inválido o expirado: continuamos sin autenticar
+                System.out.println("JWT Filter - Error al procesar token: " + e.getMessage());
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"error\":\"Token inválido\",\"message\":\"Token de autenticación inválido. Por favor, inicie sesión nuevamente.\"}");
+                return;
             }
         } else {
             System.out.println("JWT Filter - No se encontró header Authorization válido");
@@ -60,9 +72,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // Verificar si el token está revocado
             try {
                 String jti = jwtService.extractJti(jwt);
-                if (jti != null && revokedTokenRepository.existsByJti(jti)) {
+                if (jti != null && tokenRepository.existsRevokedJwtByJti(jti)) {
                     System.out.println("JWT Filter - Token revocado: " + jti);
-                    filterChain.doFilter(request, response);
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"error\":\"Token revocado\",\"message\":\"Su sesión ha sido revocada. Por favor, inicie sesión nuevamente.\"}");
                     return;
                 }
             } catch (Exception e) {
@@ -79,9 +93,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     System.out.println("JWT Filter - Usuario autenticado: " + username);
                 } else {
                     System.out.println("JWT Filter - Token inválido para usuario: " + username);
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"error\":\"Token inválido\",\"message\":\"Token de autenticación inválido. Por favor, inicie sesión nuevamente.\"}");
+                    return;
                 }
             } catch (Exception e) {
                 System.out.println("JWT Filter - Error al cargar usuario: " + e.getMessage());
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"error\":\"Error de autenticación\",\"message\":\"Error al verificar credenciales. Por favor, inicie sesión nuevamente.\"}");
+                return;
             }
         }
 
