@@ -62,6 +62,7 @@ public class DepartamentoController {
         }
     }
 
+    @PutMapping("/{id}")
     public ResponseEntity<?> actualizarDepartamento(
             @PathVariable Integer id,
             @Valid @RequestBody Departamento departamento) {
