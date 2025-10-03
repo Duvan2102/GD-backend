@@ -17,7 +17,7 @@ public class JwtService {
     @Value("${security.jwt.secret:please-change-this-secret}")
     private String jwtSecret;
 
-    @Value("${security.jwt.expiration-ms:86400000}") // 1 día
+    @Value("${security.jwt.expiration-ms:86400000}") // Tiempo de vida del token en milisegundos
     private long expirationMs;
 
     public String generateToken(UserDetails userDetails) {
@@ -37,8 +37,21 @@ public class JwtService {
     }
 
     public boolean isTokenValid(String token, UserDetails userDetails) {
-        String username = extractUsername(token);
-        return username.equals(userDetails.getUsername());
+        try {
+            String username = extractUsername(token);
+            return username.equals(userDetails.getUsername()) && !isTokenExpired(token);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public boolean isTokenExpired(String token) {
+        try {
+            DecodedJWT decoded = JWT.require(Algorithm.HMAC256(jwtSecret)).build().verify(token);
+            return decoded.getExpiresAt().before(new Date());
+        } catch (Exception e) {
+            return true; // Si no se puede verificar, consideramos que está expirado
+        }
     }
 
     public String extractJti(String token) {

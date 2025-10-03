@@ -62,4 +62,10 @@ public interface TokenRepository extends JpaRepository<Token, Integer> {
     @Transactional
     @Query("DELETE FROM Token t WHERE t.usuario.usuario = :usuario AND t.tipoValidacion = :tipo")
     void deleteByUsuarioAndTipo(@Param("usuario") String usuario, @Param("tipo") String tipo);
+
+    /**
+     * Verifica si existe un token JWT revocado por su JTI
+     */
+    @Query("SELECT COUNT(t) > 0 FROM Token t WHERE t.codigo = :jti AND t.tipoValidacion = 'JWT_REVOKED'")
+    boolean existsRevokedJwtByJti(@Param("jti") String jti);
 }
