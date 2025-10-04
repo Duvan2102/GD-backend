@@ -33,6 +33,10 @@ public class CrearSolicitudRequest {
 
     private String comentarioInicial;
 
+    private Boolean prioridad;
+
+    private Integer enviarRecordatorio;
+
     @NotNull(message = "PDF principal es obligatorio")
     private MultipartFile pdfPrincipal;
 

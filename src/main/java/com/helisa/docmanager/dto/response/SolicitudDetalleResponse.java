@@ -23,6 +23,8 @@ public class SolicitudDetalleResponse {
 	private String nombreSolicitud;
 	private String descripcionSolicitud;
     private Boolean ordenFirma;
+    private Boolean prioridad;
+    private Integer enviarRecordatorio;
     private Integer destinatariosTotal;
     private Integer destinatariosAprobados;
 
