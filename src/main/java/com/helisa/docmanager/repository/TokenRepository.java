@@ -38,7 +38,7 @@ public interface TokenRepository extends JpaRepository<Token, Integer> {
     @Modifying
     @Transactional
     @Query("DELETE FROM Token t WHERE t.fechaExp < :now")
-    void deleteExpiredTokens(@Param("now") LocalDateTime now);
+    int deleteExpiredTokens(@Param("now") LocalDateTime now);
     
     // Buscar todos los tokens de un usuario
     List<Token> findByUsuarioOrderByFechaExpDesc(Usuario usuario);
