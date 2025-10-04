@@ -44,10 +44,10 @@ public class Solicitud {
     private String detallesAdicionales;
 
     @Column(name = "prioridad")
-    private String prioridad;
+    private Boolean prioridad;
 
     @Column(name = "enviar_recordatorio")
-    private Boolean enviarRecordatorio;
+    private Integer enviarRecordatorio;
 
     @Column(name = "documento_principal")
     private String documentoPrincipal;

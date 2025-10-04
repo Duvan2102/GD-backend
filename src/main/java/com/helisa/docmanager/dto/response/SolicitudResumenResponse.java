@@ -21,6 +21,8 @@ public class SolicitudResumenResponse {
     private LocalDateTime createdAt;
     private Integer createdBy;
     private Boolean ordenFirma;
+    private Boolean prioridad;
+    private Integer enviarRecordatorio;
     private Integer destinatariosTotal;
     private Integer destinatariosAprobados;
     private List<DestinatarioResponse> destinatarios;

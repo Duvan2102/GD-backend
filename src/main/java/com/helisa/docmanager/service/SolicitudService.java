@@ -19,7 +19,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -69,6 +68,8 @@ public class SolicitudService {
             solicitud.setIdSolicitante(request.getIdSolicitante());
             solicitud.setIdTipologia(request.getIdTipologia());
             solicitud.setOrdenFirmaBoolean(request.getOrdenFirma());
+            solicitud.setPrioridad(request.getPrioridad());
+            solicitud.setEnviarRecordatorio(request.getEnviarRecordatorio());
 
             solicitud.setEstado(estadoPendiente);
 
@@ -274,6 +275,8 @@ public class SolicitudService {
                 .createdAt(solicitud.getCreatedAt())
                 .createdBy(solicitud.getIdSolicitante())
                 .ordenFirma(solicitud.getOrdenFirmaBoolean())
+                .prioridad(solicitud.getPrioridad())
+                .enviarRecordatorio(solicitud.getEnviarRecordatorio())
                 .destinatariosTotal(total.intValue())
                 .destinatariosAprobados(aprobados.intValue())
                 .pdfOriginalName(solicitud.getPdfOriginalName())
@@ -355,6 +358,8 @@ public class SolicitudService {
                 .solicitanteCargo(cargoSolicitante)
                 .solicitanteName(solicitanteNombre)
                 .ordenFirma(Boolean.TRUE.equals(s.getOrdenFirmaBoolean()))
+                .prioridad(s.getPrioridad())
+                .enviarRecordatorio(s.getEnviarRecordatorio())
                 .destinatarios(destinatarios)
                 .destinatariosTotal(total)
                 .destinatariosAprobados(aprobados)

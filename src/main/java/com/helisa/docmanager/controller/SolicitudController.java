@@ -42,6 +42,8 @@ public class SolicitudController {
             @RequestParam("ordenFirma") Boolean ordenFirma,
             @RequestParam(value = "comentarioInicial", required = false) String comentarioInicial,
             @RequestParam(value = "nombreSolicitud", required = true) String nombreSolicitud,
+            @RequestParam(value = "prioridad", required = false) Boolean prioridad,
+            @RequestParam(value = "enviarRecordatorio", required = false) Integer enviarRecordatorio,
             @RequestPart("pdfPrincipal") MultipartFile pdfPrincipal,
             @RequestPart(value = "adjuntos", required = false) MultipartFile[] adjuntos,
             @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
@@ -55,6 +57,8 @@ public class SolicitudController {
                 .nombreSolicitud(nombreSolicitud)
                 .ordenFirma(ordenFirma)
                 .comentarioInicial(comentarioInicial)
+                .prioridad(prioridad)
+                .enviarRecordatorio(enviarRecordatorio)
                 .pdfPrincipal(pdfPrincipal)
                 .adjuntos(adjuntos)
                 .build();
