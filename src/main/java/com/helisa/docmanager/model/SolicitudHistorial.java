@@ -39,7 +39,7 @@ public class SolicitudHistorial {
     private LocalDateTime fecha = LocalDateTime.now();
 
     public enum AccionEnum {
-        CREAR, APROBAR, RECHAZAR, CANCELAR, ADJUNTAR
+        CREAR, APROBAR, RECHAZAR, CANCELAR, ADJUNTAR, DESCARGAR
     }
 
     // Factory methods
