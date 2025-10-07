@@ -55,4 +55,7 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, Integer> {
     Long countByEstadoId(@Param("estadoId") Integer estadoId);
 
     boolean existsById(Integer id);
+
+    // Listar solicitudes pendientes que tengan periodicidad de recordatorio configurada (> 0)
+    java.util.List<Solicitud> findByEstado_IdEstadoAndEnviarRecordatorioGreaterThan(Integer idEstado, Integer minValor);
 }

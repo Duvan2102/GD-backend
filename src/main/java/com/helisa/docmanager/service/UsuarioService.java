@@ -3,6 +3,7 @@ package com.helisa.docmanager.service;
 import com.helisa.docmanager.model.Cargo;
 import com.helisa.docmanager.model.Usuario;
 import com.helisa.docmanager.model.Estado;
+import com.helisa.docmanager.model.Rol;
 import com.helisa.docmanager.repository.CargoRepository;
 import com.helisa.docmanager.repository.UsuarioRepository;
 import com.helisa.docmanager.repository.EstadoRepository;
@@ -166,6 +167,15 @@ public class UsuarioService {
                 usuario.setCargo(cargoOpt.get());
             } else {
                 throw new RuntimeException("El cargo especificado no existe: " + usuarioActualizado.getCargo().getIdCargo());
+            }
+        }
+
+        if (usuarioActualizado.getRol() != null && usuarioActualizado.getRol().getIdRol() != null) {
+            Optional<Rol> rolOpt = rolRepository.findById(usuarioActualizado.getRol().getIdRol());
+            if (rolOpt.isPresent()) {
+                usuario.setRol(rolOpt.get());
+            } else {
+                throw new RuntimeException("El rol especificado no existe: " + usuarioActualizado.getRol().getIdRol());
             }
         }
 

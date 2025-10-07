@@ -71,6 +71,18 @@ public class SolicitudController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @PostMapping("/{solicitudId}/descargas")
+    public ResponseEntity<Void> registrarDescarga(
+            @PathVariable("solicitudId") Integer solicitudId,
+            @RequestParam("usuarioId") Integer usuarioId,
+            @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
+
+        log.info("Registrar descarga - CorrelationId: {}, Solicitud: {}, Usuario: {}",
+                correlationId, solicitudId, usuarioId);
+        solicitudService.registrarDescarga(solicitudId, usuarioId);
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<SolicitudDetalleResponse> obtenerDetalle(
             @PathVariable Integer id,
@@ -179,6 +191,27 @@ public class SolicitudController {
         } catch (Exception e) {
             log.error("Error al descargar adjunto {} de solicitud {}", adjuntoId, id, e);
             throw new RuntimeException("Error al descargar adjunto");
+        }
+    }
+
+    @GetMapping("/{id}/descargar-todo")
+    public ResponseEntity<InputStreamResource> descargarTodo(
+            @PathVariable Integer id,
+            @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
+        try {
+            log.info("Descargando todo (ZIP) - Solicitud: {}, CorrelationId: {}", id, correlationId);
+            InputStream zipStream = solicitudService.descargarTodoComoZip(id);
+            String zipName = "solicitud-" + id + ".zip";
+            String encodedFilename = URLEncoder.encode(zipName, StandardCharsets.UTF_8).replaceAll("\\+", "%20");
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + encodedFilename + "\"")
+                    .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .body(new InputStreamResource(zipStream));
+        } catch (Exception e) {
+            log.error("Error al descargar ZIP de solicitud {}", id, e);
+            throw new RuntimeException("Error al descargar todo");
         }
     }
 

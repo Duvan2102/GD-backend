@@ -197,6 +197,31 @@ public class EmailService {
     }
 
     /**
+     * Envía correo simple de recordatorio de solicitud
+     * @param email Email del destinatario
+     * @param numeroSolicitud Número/ID de la solicitud
+     */
+    public void enviarRecordatorioSolicitud(String email, Integer numeroSolicitud) {
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(fromEmail);
+            message.setTo(email);
+            message.setSubject("Recordatorio de Solicitud - Helisa Document Manager");
+
+            String body = String.format(
+                "recuerda revisar la solicitud N° %d",
+                numeroSolicitud
+            );
+
+            message.setText(body);
+            mailSender.send(message);
+
+        } catch (Exception e) {
+            throw new RuntimeException("Error al enviar recordatorio de solicitud: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Genera un token simple para restablecimiento de contraseña
      * En un entorno de producción, esto debería ser más seguro
      * @param usuario Usuario para el cual generar el token

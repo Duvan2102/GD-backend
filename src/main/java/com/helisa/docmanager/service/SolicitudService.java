@@ -471,6 +471,16 @@ public class SolicitudService {
         historialRepository.save(historial);
     }
 
+    // Registrar evento de descarga por parte de un usuario
+    @Transactional
+    public void registrarDescarga(Integer solicitudId, Integer usuarioId) {
+        Solicitud solicitud = solicitudRepository.findById(solicitudId)
+                .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
+
+        crearHistorial(solicitud, usuarioId, SolicitudHistorial.AccionEnum.DESCARGAR,
+                "Usuario " + usuarioId + " descargó archivos de la solicitud");
+    }
+
     private void eliminarArchivos(Solicitud solicitud) {
         try {
             if (solicitud.getPdfPath() != null) {
@@ -575,6 +585,88 @@ public class SolicitudService {
         return adjunto.getOriginalName();
     }
 
+
+    // Genera un ZIP con: PDF principal, adjuntos y un PDF con tabla de log (nombre/acción/fecha)
+    @Transactional(readOnly = true)
+    public InputStream descargarTodoComoZip(Integer solicitudId) throws Exception {
+        Solicitud solicitud = solicitudRepository.findById(solicitudId)
+                .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
+
+        // Recolectar recursos
+        InputStream pdfPrincipal = storageService.leerArchivo(solicitud.getPdfPath());
+        List<SolicitudAdjunto> adjuntos = adjuntoRepository.findBySolicitudId(solicitudId);
+        List<SolicitudHistorial> historial = historialRepository.findBySolicitudIdOrderByFechaAsc(solicitudId.longValue());
+
+        // Generar PDF de log en memoria
+        byte[] pdfLog = generarPdfLog(historial);
+
+        // Crear ZIP en memoria
+        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+        try (java.util.zip.ZipOutputStream zos = new java.util.zip.ZipOutputStream(baos)) {
+            // PDF principal
+            agregarEntradaZip(zos, "principal/" + solicitud.getPdfOriginalName(), pdfPrincipal);
+
+            // Adjuntos
+            for (SolicitudAdjunto adj : adjuntos) {
+                try (InputStream is = storageService.leerArchivo(adj.getPath())) {
+                    agregarEntradaZip(zos, "adjuntos/" + adj.getOriginalName(), is);
+                }
+            }
+
+            // PDF de log
+            agregarEntradaZip(zos, "log/log-solicitud-" + solicitudId + ".pdf", new java.io.ByteArrayInputStream(pdfLog));
+        }
+
+        return new java.io.ByteArrayInputStream(baos.toByteArray());
+    }
+
+    private void agregarEntradaZip(java.util.zip.ZipOutputStream zos, String nombreEntrada, InputStream contenido) throws Exception {
+        zos.putNextEntry(new java.util.zip.ZipEntry(nombreEntrada));
+        contenido.transferTo(zos);
+        zos.closeEntry();
+        contenido.close();
+    }
+
+    // Genera PDF simple con tabla (nombre/accion/fecha)
+    private byte[] generarPdfLog(List<SolicitudHistorial> historial) throws Exception {
+        org.apache.pdfbox.pdmodel.PDDocument doc = new org.apache.pdfbox.pdmodel.PDDocument();
+        org.apache.pdfbox.pdmodel.PDPage page = new org.apache.pdfbox.pdmodel.PDPage();
+        doc.addPage(page);
+
+        org.apache.pdfbox.pdmodel.PDPageContentStream cs = new org.apache.pdfbox.pdmodel.PDPageContentStream(doc, page);
+        org.apache.pdfbox.pdmodel.font.PDType1Font font = org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA;
+
+        float margin = 50f;
+        float y = page.getMediaBox().getHeight() - margin;
+        float leading = 16f;
+
+        cs.beginText();
+        cs.setFont(font, 12);
+        cs.newLineAtOffset(margin, y);
+        cs.showText("Log de Solicitud");
+        cs.newLineAtOffset(0, -leading * 2);
+
+        // Encabezados
+        cs.showText("Nombre / Acción / Fecha");
+        cs.newLineAtOffset(0, -leading);
+
+        java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+        for (SolicitudHistorial h : historial) {
+            String nombre = h.getActorUsuarioId() != null ? ("Usuario " + h.getActorUsuarioId()) : "Sistema";
+            String linea = nombre + " / " + h.getAccion().name() + " / " + (h.getFecha() != null ? h.getFecha().format(fmt) : "");
+            cs.showText(linea);
+            cs.newLineAtOffset(0, -leading);
+        }
+
+        cs.endText();
+        cs.close();
+
+        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+        doc.save(baos);
+        doc.close();
+        return baos.toByteArray();
+    }
 
 
 
