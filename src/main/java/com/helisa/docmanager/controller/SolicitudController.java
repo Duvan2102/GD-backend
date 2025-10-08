@@ -19,7 +19,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 import java.net.URLEncoder;
@@ -36,32 +35,11 @@ public class SolicitudController {
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<SolicitudDetalleResponse> crear(
-            @RequestParam("idSolicitante") Integer idSolicitante,
-            @RequestParam("idTipologia") Integer idTipologia,
-            @RequestParam("destinatarios") Integer[] destinatarios,
-            @RequestParam("ordenFirma") Boolean ordenFirma,
-            @RequestParam(value = "comentarioInicial", required = false) String comentarioInicial,
-            @RequestParam(value = "nombreSolicitud", required = true) String nombreSolicitud,
-            @RequestParam(value = "prioridad", required = false) Boolean prioridad,
-            @RequestParam(value = "enviarRecordatorio", required = false) Integer enviarRecordatorio,
-            @RequestPart("pdfPrincipal") MultipartFile pdfPrincipal,
-            @RequestPart(value = "adjuntos", required = false) MultipartFile[] adjuntos,
+            @Valid @ModelAttribute CrearSolicitudRequest request,
             @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
 
-        log.info("Creando solicitud - CorrelationId: {}, Solicitante: {}", correlationId, idSolicitante);
-
-        CrearSolicitudRequest request = CrearSolicitudRequest.builder()
-                .idSolicitante(idSolicitante)
-                .idTipologia(idTipologia)
-                .destinatarios(destinatarios)
-                .nombreSolicitud(nombreSolicitud)
-                .ordenFirma(ordenFirma)
-                .comentarioInicial(comentarioInicial)
-                .prioridad(prioridad)
-                .enviarRecordatorio(enviarRecordatorio)
-                .pdfPrincipal(pdfPrincipal)
-                .adjuntos(adjuntos)
-                .build();
+        log.info("Creando solicitud - CorrelationId: {}, Solicitante: {}", 
+                correlationId, request.getIdSolicitante());
 
         SolicitudDetalleResponse response = solicitudService.crear(request);
 
