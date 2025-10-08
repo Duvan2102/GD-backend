@@ -152,8 +152,8 @@ public class SolicitudService {
         destinatario.rechazar(request.getComentario());
         destinatarioRepository.save(destinatario);
 
-        // Eliminar archivos
-        eliminarArchivos(solicitud);
+        // NOTA: Los archivos NO se eliminan cuando se rechaza una solicitud
+        // para mantener un historial completo de documentos
 
         // Crear historial
         crearHistorial(solicitud, request.getUsuarioId(),
@@ -179,8 +179,8 @@ public class SolicitudService {
         solicitud.setEstado(estadoCancelado);
         solicitudRepository.save(solicitud);
 
-        // Eliminar archivos
-        eliminarArchivos(solicitud);
+        // NOTA: Los archivos NO se eliminan cuando se cancela una solicitud
+        // para mantener un historial completo de documentos
 
         // Crear historial
         SolicitudHistorial historial = SolicitudHistorial.crear(
@@ -481,23 +481,6 @@ public class SolicitudService {
                 "Usuario " + usuarioId + " descargó archivos de la solicitud");
     }
 
-    private void eliminarArchivos(Solicitud solicitud) {
-        try {
-            if (solicitud.getPdfPath() != null) {
-                storageService.borrarArchivo(solicitud.getPdfPath());
-            }
-
-            List<SolicitudAdjunto> adjuntos = adjuntoRepository.findBySolicitudId(solicitud.getId());
-            for (SolicitudAdjunto adjunto : adjuntos) {
-                storageService.borrarArchivo(adjunto.getPath());
-            }
-
-            log.info("Archivos eliminados para solicitud: {}", solicitud.getId());
-
-        } catch (Exception e) {
-            log.error("Error al eliminar archivos de solicitud: {}", solicitud.getId(), e);
-        }
-    }
 
 
     @Transactional(readOnly = true)

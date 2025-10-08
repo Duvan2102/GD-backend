@@ -4,6 +4,7 @@ import com.helisa.docmanager.security.JwtAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -34,12 +35,31 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/admin/usuarios/pendientes").authenticated()
-                        .requestMatchers("/api/admin/usuarios/*/activar").authenticated()
-                        .requestMatchers("/api/admin/usuarios/*/rechazar").authenticated()
-                        .requestMatchers("/api/admin/usuarios/*/estado-pendiente").authenticated()
-                        .requestMatchers("OPTIONS", "/**").permitAll()
+                        // Permitir peticiones OPTIONS para CORS preflight
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        
+                        // Endpoints públicos de autenticación (solo login y registro)
+                        .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/validate-2fa").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/send-email-code").permitAll()
+                        
+                        // Endpoints públicos de recuperación de contraseña
+                        .requestMatchers(HttpMethod.POST, "/api/password-reset/request").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/password-reset/confirm").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/password-reset/validate-token").permitAll()
+                        
+                        // Todos los demás endpoints de auth requieren autenticación
+                        .requestMatchers("/api/auth/**").authenticated()
+                        
+                        // Endpoints de administración
+                        .requestMatchers("/api/admin/**").authenticated()
+                        .requestMatchers("/api/usuarios/pendientes").authenticated()
+                        .requestMatchers("/api/usuarios/*/activar").authenticated()
+                        .requestMatchers("/api/usuarios/*/rechazar").authenticated()
+                        .requestMatchers("/api/usuarios/*/estado-pendiente").authenticated()
+                        
+                        // Todos los demás endpoints requieren autenticación
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
@@ -60,11 +80,21 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
+        
+        // IMPORTANTE: En producción, reemplazar "*" con los dominios específicos de tu frontend
+        // Ejemplo: Arrays.asList("https://tu-dominio.com", "https://app.tu-dominio.com")
         configuration.setAllowedOriginPatterns(Arrays.asList("*"));
+        
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Correlation-Id", "Accept"));
+        
+        // Permitir credenciales si usas cookies o autenticación basada en sesión
         configuration.setAllowCredentials(false);
-        configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Type"));
+        
+        // Exponer headers necesarios para el cliente
+        configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Type", "Content-Disposition"));
+        
+        // Tiempo de caché para preflight requests (1 hora)
         configuration.setMaxAge(3600L);
         
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
