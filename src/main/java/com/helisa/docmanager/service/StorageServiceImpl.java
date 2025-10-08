@@ -93,4 +93,9 @@ public class StorageServiceImpl implements StorageService {
             return file.getContentType();
         }
     }
+
+    @Override
+    public String getBasePath() {
+        return basePath;
+    }
 }
