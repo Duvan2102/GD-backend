@@ -4,6 +4,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -16,6 +17,7 @@ import com.helisa.docmanager.repository.TokenRepository;
 
 import java.io.IOException;
 
+@Slf4j
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
@@ -48,7 +50,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             try {
                 // Verificar si el token está expirado antes de procesarlo
                 if (jwtService.isTokenExpired(jwt)) {
-                    System.out.println("JWT Filter - Token expirado");
+                    log.warn("Token expirado recibido");
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     response.setContentType("application/json");
                     response.getWriter().write("{\"error\":\"Token expirado\",\"message\":\"Su sesión ha expirado. Por favor, inicie sesión nuevamente.\"}");
@@ -56,16 +58,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
                 
                 username = jwtService.extractUsername(jwt);
-                System.out.println("JWT Filter - Username extraído: " + username);
+                log.debug("Usuario extraído del token: {}", username);
             } catch (Exception e) {
-                System.out.println("JWT Filter - Error al procesar token: " + e.getMessage());
+                log.warn("Error al procesar token JWT: {}", e.getMessage());
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.setContentType("application/json");
                 response.getWriter().write("{\"error\":\"Token inválido\",\"message\":\"Token de autenticación inválido. Por favor, inicie sesión nuevamente.\"}");
                 return;
             }
         } else {
-            System.out.println("JWT Filter - No se encontró header Authorization válido");
+            log.debug("No se encontró header Authorization en la petición a: {}", request.getRequestURI());
         }
 
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
@@ -73,14 +75,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             try {
                 String jti = jwtService.extractJti(jwt);
                 if (jti != null && tokenRepository.existsRevokedJwtByJti(jti)) {
-                    System.out.println("JWT Filter - Token revocado: " + jti);
+                    log.warn("Intento de uso de token revocado - JTI: {}", jti);
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     response.setContentType("application/json");
                     response.getWriter().write("{\"error\":\"Token revocado\",\"message\":\"Su sesión ha sido revocada. Por favor, inicie sesión nuevamente.\"}");
                     return;
                 }
             } catch (Exception e) {
-                System.out.println("JWT Filter - Error al verificar token revocado: " + e.getMessage());
+                log.error("Error al verificar token revocado: {}", e.getMessage());
             }
 
             try {
@@ -90,16 +92,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                             userDetails, null, userDetails.getAuthorities());
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
-                    System.out.println("JWT Filter - Usuario autenticado: " + username);
+                    log.debug("Usuario autenticado exitosamente: {}", username);
                 } else {
-                    System.out.println("JWT Filter - Token inválido para usuario: " + username);
+                    log.warn("Token inválido para usuario: {}", username);
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     response.setContentType("application/json");
                     response.getWriter().write("{\"error\":\"Token inválido\",\"message\":\"Token de autenticación inválido. Por favor, inicie sesión nuevamente.\"}");
                     return;
                 }
             } catch (Exception e) {
-                System.out.println("JWT Filter - Error al cargar usuario: " + e.getMessage());
+                log.error("Error al cargar usuario durante autenticación: {}", e.getMessage());
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.setContentType("application/json");
                 response.getWriter().write("{\"error\":\"Error de autenticación\",\"message\":\"Error al verificar credenciales. Por favor, inicie sesión nuevamente.\"}");
