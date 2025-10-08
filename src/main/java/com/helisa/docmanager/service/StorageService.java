@@ -2,7 +2,6 @@ package com.helisa.docmanager.service;
 
 import org.springframework.web.multipart.MultipartFile;
 import java.io.InputStream;
-import java.nio.file.Path;
 
 public interface StorageService {
     String guardarArchivo(MultipartFile file, String prefijo) throws Exception;
@@ -12,4 +11,5 @@ public interface StorageService {
     boolean validarExtension(String fileName, String[] extensionesPermitidas);
     boolean validarTamano(long size, long maxSize);
     String detectarMimeType(MultipartFile file);
+    String getBasePath();
 }

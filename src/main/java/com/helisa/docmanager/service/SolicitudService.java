@@ -592,8 +592,6 @@ public class SolicitudService {
         Solicitud solicitud = solicitudRepository.findById(solicitudId)
                 .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
 
-        // Recolectar recursos
-        InputStream pdfPrincipal = storageService.leerArchivo(solicitud.getPdfPath());
         List<SolicitudAdjunto> adjuntos = adjuntoRepository.findBySolicitudId(solicitudId);
         List<SolicitudHistorial> historial = historialRepository.findBySolicitudIdOrderByFechaAsc(solicitudId.longValue());
 
@@ -603,13 +601,32 @@ public class SolicitudService {
         // Crear ZIP en memoria
         java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
         try (java.util.zip.ZipOutputStream zos = new java.util.zip.ZipOutputStream(baos)) {
-            // PDF principal
-            agregarEntradaZip(zos, "principal/" + solicitud.getPdfOriginalName(), pdfPrincipal);
+            
+            // PDF principal - verificar existencia antes de agregar
+            if (solicitud.getPdfPath() != null && archivoExiste(solicitud.getPdfPath())) {
+                try (InputStream pdfPrincipal = storageService.leerArchivo(solicitud.getPdfPath())) {
+                    agregarEntradaZip(zos, "principal/" + solicitud.getPdfOriginalName(), pdfPrincipal);
+                }
+            } else {
+                log.warn("PDF principal no encontrado para solicitud {}: {}", solicitudId, solicitud.getPdfPath());
+                // Agregar archivo de notificación en lugar del PDF faltante
+                String mensaje = "PDF principal no disponible: " + solicitud.getPdfPath();
+                agregarEntradaZip(zos, "principal/ARCHIVO_NO_ENCONTRADO.txt", 
+                    new java.io.ByteArrayInputStream(mensaje.getBytes()));
+            }
 
-            // Adjuntos
+            // Adjuntos - verificar existencia antes de agregar
             for (SolicitudAdjunto adj : adjuntos) {
-                try (InputStream is = storageService.leerArchivo(adj.getPath())) {
-                    agregarEntradaZip(zos, "adjuntos/" + adj.getOriginalName(), is);
+                if (archivoExiste(adj.getPath())) {
+                    try (InputStream is = storageService.leerArchivo(adj.getPath())) {
+                        agregarEntradaZip(zos, "adjuntos/" + adj.getOriginalName(), is);
+                    }
+                } else {
+                    log.warn("Adjunto no encontrado para solicitud {}: {}", solicitudId, adj.getPath());
+                    // Agregar archivo de notificación en lugar del adjunto faltante
+                    String mensaje = "Adjunto no disponible: " + adj.getOriginalName() + " (" + adj.getPath() + ")";
+                    agregarEntradaZip(zos, "adjuntos/" + adj.getOriginalName() + ".NO_ENCONTRADO.txt", 
+                        new java.io.ByteArrayInputStream(mensaje.getBytes()));
                 }
             }
 
@@ -625,6 +642,16 @@ public class SolicitudService {
         contenido.transferTo(zos);
         zos.closeEntry();
         contenido.close();
+    }
+
+    private boolean archivoExiste(String path) {
+        try {
+            java.nio.file.Path rutaCompleta = java.nio.file.Paths.get(storageService.getBasePath(), path);
+            return java.nio.file.Files.exists(rutaCompleta);
+        } catch (Exception e) {
+            log.warn("Error verificando existencia del archivo: {}", path, e);
+            return false;
+        }
     }
 
     // Genera PDF simple con tabla (nombre/accion/fecha)
