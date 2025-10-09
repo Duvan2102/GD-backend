@@ -16,6 +16,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import com.helisa.docmanager.repository.TokenRepository;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 
 @Slf4j
 @Component
@@ -30,13 +32,36 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Autowired
     private TokenRepository tokenRepository;
 
+    // Lista de endpoints públicos que no requieren autenticación
+    private static final List<String> PUBLIC_ENDPOINTS = Arrays.asList(
+        "/api/auth/login",
+        "/api/auth/register", 
+        "/api/auth/validate-2fa",
+        "/api/auth/send-email-code",
+        "/api/auth/2fa-status/",
+        "/api/password-reset/request",
+        "/api/password-reset/confirm",
+        "/api/password-reset/validate-token"
+    );
+
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
 
+        String requestPath = request.getRequestURI();
+        String requestMethod = request.getMethod();
+
         // Saltar el filtro para peticiones OPTIONS (preflight)
-        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+        if ("OPTIONS".equalsIgnoreCase(requestMethod)) {
+            log.debug("Saltando filtro JWT para petición OPTIONS: {}", requestPath);
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        // Saltar el filtro para endpoints públicos
+        if (isPublicEndpoint(requestPath, requestMethod)) {
+            log.debug("Saltando filtro JWT para endpoint público: {} {}", requestMethod, requestPath);
             filterChain.doFilter(request, response);
             return;
         }
@@ -110,5 +135,41 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * Verifica si un endpoint es público y no requiere autenticación
+     */
+    private boolean isPublicEndpoint(String requestPath, String requestMethod) {
+        for (String publicEndpoint : PUBLIC_ENDPOINTS) {
+            if (requestPath.startsWith(publicEndpoint)) {
+                // Verificación adicional para endpoints específicos
+                if ("/api/auth/login".equals(publicEndpoint) && "POST".equals(requestMethod)) {
+                    return true;
+                }
+                if ("/api/auth/register".equals(publicEndpoint) && "POST".equals(requestMethod)) {
+                    return true;
+                }
+                if ("/api/auth/validate-2fa".equals(publicEndpoint) && "POST".equals(requestMethod)) {
+                    return true;
+                }
+                if ("/api/auth/send-email-code".equals(publicEndpoint) && "POST".equals(requestMethod)) {
+                    return true;
+                }
+                if ("/api/auth/2fa-status/".equals(publicEndpoint) && "GET".equals(requestMethod)) {
+                    return true;
+                }
+                if ("/api/password-reset/request".equals(publicEndpoint) && "POST".equals(requestMethod)) {
+                    return true;
+                }
+                if ("/api/password-reset/confirm".equals(publicEndpoint) && "POST".equals(requestMethod)) {
+                    return true;
+                }
+                if ("/api/password-reset/validate-token".equals(publicEndpoint) && "GET".equals(requestMethod)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }
