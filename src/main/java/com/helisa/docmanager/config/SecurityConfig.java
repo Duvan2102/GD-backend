@@ -85,14 +85,18 @@ public class SecurityConfig {
         // Ejemplo: Arrays.asList("https://tu-dominio.com", "https://app.tu-dominio.com")
         configuration.setAllowedOriginPatterns(Arrays.asList("*"));
         
+        // Permitir todos los métodos HTTP
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Correlation-Id", "Accept"));
         
-        // Permitir credenciales si usas cookies o autenticación basada en sesión
+        // Permitir todos los headers para evitar problemas de CORS
+        // En producción puedes restringir a headers específicos
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        
+        // Permitir credenciales (cookies, authorization headers)
         configuration.setAllowCredentials(false);
         
         // Exponer headers necesarios para el cliente
-        configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Type", "Content-Disposition"));
+        configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Type", "Content-Disposition", "X-Correlation-Id"));
         
         // Tiempo de caché para preflight requests (1 hora)
         configuration.setMaxAge(3600L);
