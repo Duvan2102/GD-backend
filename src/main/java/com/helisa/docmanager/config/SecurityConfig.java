@@ -38,7 +38,9 @@ public class SecurityConfig {
                         // Permitir peticiones OPTIONS para CORS preflight
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         
-                        // Endpoints públicos de autenticación (solo login y registro)
+                        // IMPORTANTE: Las reglas específicas DEBEN ir ANTES que las generales
+                        
+                        // Endpoints públicos de autenticación (ORDEN ESPECÍFICO)
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/validate-2fa").permitAll()
@@ -50,15 +52,16 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/password-reset/confirm").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/password-reset/validate-token").permitAll()
                         
-                        // Todos los demás endpoints de auth requieren autenticación
-                        .requestMatchers("/api/auth/**").authenticated()
-                        
-                        // Endpoints de administración
+                        // Endpoints de administración específicos
                         .requestMatchers("/api/admin/**").authenticated()
                         .requestMatchers("/api/usuarios/pendientes").authenticated()
                         .requestMatchers("/api/usuarios/*/activar").authenticated()
                         .requestMatchers("/api/usuarios/*/rechazar").authenticated()
                         .requestMatchers("/api/usuarios/*/estado-pendiente").authenticated()
+                        
+                        // REGLAS GENERALES AL FINAL (menor prioridad)
+                        // Todos los demás endpoints de auth requieren autenticación
+                        .requestMatchers("/api/auth/**").authenticated()
                         
                         // Todos los demás endpoints requieren autenticación
                         .anyRequest().authenticated()
