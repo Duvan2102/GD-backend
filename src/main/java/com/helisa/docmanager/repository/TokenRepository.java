@@ -33,6 +33,12 @@ public interface TokenRepository extends JpaRepository<Token, Integer> {
                                                   @Param("tipo") String tipo, 
                                                   @Param("now") LocalDateTime now);
     
+    @Query("SELECT t FROM Token t WHERE t.codigo = :codigo AND t.usuario = :usuario AND t.tipoValidacion = :tipo AND t.fechaExp > :now")
+    Optional<Token> findValidTokenByCodigoUsuarioAndTipo(@Param("codigo") String codigo,
+                                                          @Param("usuario") Usuario usuario,
+                                                          @Param("tipo") String tipo, 
+                                                          @Param("now") LocalDateTime now);
+    
     
     @Modifying
     @Transactional

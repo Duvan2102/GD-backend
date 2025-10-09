@@ -85,10 +85,8 @@ public class AuthController {
             Usuario usuario = usuarioRepository.findByUsuario(request.getUsuario())
                     .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
-            // Registrar login exitoso
             loginAttemptService.recordSuccessfulLogin(request.getUsuario(), ipAddress);
 
-            // Siempre requerir 2FA después del login exitoso
             String tempToken = jwtService.generateTempToken(userDetails.getUsername());
             return ResponseEntity.status(HttpStatus.ACCEPTED)
                     .body(new TwoFactorRequiredResponse("Se requiere código de verificación", 

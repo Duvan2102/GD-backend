@@ -80,19 +80,14 @@ public class TwoFactorAuthService {
     public boolean validateEmailCode(String codigo, Usuario usuario) {
         LocalDateTime now = LocalDateTime.now();
         
-        // Buscar el token por código y tipo
-        var tokenOpt = tokenRepository.findValidTokenByCodigoAndTipo(codigo, TIPO_EMAIL_CODE, now);
+        // Buscar el token por código, usuario y tipo - CRÍTICO: debe filtrar por usuario desde el inicio
+        var tokenOpt = tokenRepository.findValidTokenByCodigoUsuarioAndTipo(codigo, usuario, TIPO_EMAIL_CODE, now);
         
         if (tokenOpt.isEmpty()) {
-            return false; // Código no encontrado o expirado
+            return false; // Código no encontrado, no pertenece al usuario o expirado
         }
         
         Token token = tokenOpt.get();
-        
-        // Verificar que el token pertenece al usuario correcto
-        if (!token.getUsuario().getIdUsuario().equals(usuario.getIdUsuario())) {
-            return false; // El código no pertenece a este usuario
-        }
         
         // Verificar que es el código más reciente del usuario
         // (prevenir uso de códigos antiguos que aún no han expirado)

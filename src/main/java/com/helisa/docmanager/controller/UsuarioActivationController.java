@@ -17,10 +17,6 @@ public class UsuarioActivationController {
     @Autowired
     private UsuarioActivationService usuarioActivationService;
 
-    /**
-     * Obtiene todos los usuarios pendientes
-     * @return Lista de usuarios pendientes
-     */
     @GetMapping("/pendientes")
     public ResponseEntity<?> obtenerUsuariosPendientes() {
         try {
@@ -32,13 +28,6 @@ public class UsuarioActivationController {
         }
     }
 
-    /**
-     * Activa un usuario pendiente o inactivo
-     * - Si está PENDIENTE: se le enviará un correo para que cree su contraseña
-     * - Si está INACTIVO: se le enviará un correo notificando su reactivación
-     * @param idUsuario ID del usuario a activar
-     * @return Usuario activado
-     */
     @PostMapping("/{idUsuario}/activar")
     public ResponseEntity<?> activarUsuario(@PathVariable Integer idUsuario) {
         try {
@@ -62,11 +51,6 @@ public class UsuarioActivationController {
         }
     }
 
-    /**
-     * Rechaza un usuario pendiente
-     * @param idUsuario ID del usuario a rechazar
-     * @return Usuario rechazado
-     */
     @PostMapping("/{idUsuario}/rechazar")
     public ResponseEntity<?> rechazarUsuario(@PathVariable Integer idUsuario) {
         try {
@@ -83,12 +67,7 @@ public class UsuarioActivationController {
                     .body(new ErrorResponse("ERROR_RECHAZO", e.getMessage()));
         }
     }
-
-    /**
-     * Verifica si un usuario está pendiente
-     * @param idUsuario ID del usuario
-     * @return true si está pendiente, false en caso contrario
-     */
+    
     @GetMapping("/{idUsuario}/estado-pendiente")
     public ResponseEntity<?> verificarEstadoPendiente(@PathVariable Integer idUsuario) {
         try {
@@ -100,7 +79,6 @@ public class UsuarioActivationController {
         }
     }
 
-    // Clases de respuesta
     @lombok.Data
     public static class ErrorResponse {
         private final String code;
@@ -127,4 +105,3 @@ public class UsuarioActivationController {
         }
     }
 }
-
