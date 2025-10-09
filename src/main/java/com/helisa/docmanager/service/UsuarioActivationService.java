@@ -49,6 +49,7 @@ public class UsuarioActivationService {
         }
 
         boolean esPendiente = estadoActual.equals("PENDIENTE");
+        boolean esActivo = estadoActual.equals("ACTIVO");
 
         // Cambiar estado a ACTIVO
         Estado estadoActivo = estadoRepository.findByDescripcion("ACTIVO")
@@ -60,7 +61,7 @@ public class UsuarioActivationService {
         // Si el usuario tiene correo, enviar notificación
         if (usuario.getCorreoEmpresarial() != null && !usuario.getCorreoEmpresarial().trim().isEmpty()) {
             try {
-                if (esPendiente) {
+                if (esPendiente || esActivo) {
                     // Para usuarios PENDIENTES: generar token y enviar correo para crear contraseña
                     String token = passwordResetService.generarTokenParaActivacion(usuario.getIdUsuario());
                     emailService.enviarCorreoActivacionConToken(usuario, token);
