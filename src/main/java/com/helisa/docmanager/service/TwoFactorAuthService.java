@@ -110,31 +110,27 @@ public class TwoFactorAuthService {
         return true;
     }
 
-    /**
-     * Envía código de verificación por email
-     * - Invalida todos los códigos anteriores del usuario
-     * - Genera un nuevo código con tiempo de vida configurable
-     * - Solo el último código generado será válido
-     */
+
     @Transactional
     public Token sendEmailCode(Usuario usuario) {
-        // Verificar límite de intentos
         if (hasExceededAttemptLimit(usuario, TIPO_EMAIL_CODE)) {
             throw new RuntimeException("Has excedido el límite de intentos. Intenta más tarde.");
         }
 
-        // IMPORTANTE: Invalidar/eliminar todos los códigos de email anteriores del usuario
-        // Solo debe existir UN código válido a la vez
         LocalDateTime now = LocalDateTime.now();
+        
+        // Verificar si existe un código válido (no expirado)
         List<Token> tokensPrevios = tokenRepository.findValidTokensByUsuarioAndTipoOrderByFechaExpDesc(
             usuario, TIPO_EMAIL_CODE, now);
         
         if (!tokensPrevios.isEmpty()) {
-            // Eliminar códigos anteriores para que no se puedan usar
-            tokenRepository.deleteAll(tokensPrevios);
+            // Hay un código válido que aún no ha expirado
+            Token tokenActual = tokensPrevios.get(0);
+            long minutosRestantes = java.time.Duration.between(now, tokenActual.getFechaExp()).toMinutes();
+            throw new RuntimeException("Ya existe un código válido enviado. Expira en " + minutosRestantes + " minuto(s). Usa ese código o espera a que expire.");
         }
 
-        // Generar nuevo código
+        // No hay códigos válidos, generar uno nuevo
         String codigo = generateEmailCode();
         
         // Crear token con tiempo de vida configurable
@@ -245,10 +241,6 @@ public class TwoFactorAuthService {
         }
     }
 
-    /**
-     * Verifica si el usuario ha excedido el límite de intentos
-     * Usa el valor configurable desde properties
-     */
     private boolean hasExceededAttemptLimit(Usuario usuario, String tipo) {
         LocalDateTime oneHourAgo = LocalDateTime.now().minusHours(1);
         Long attempts = tokenRepository.countTokensByUsuarioAndTipoSince(usuario, tipo, oneHourAgo);

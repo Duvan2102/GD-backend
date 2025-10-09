@@ -420,6 +420,18 @@ public class AuthController {
 
             twoFactorAuthService.sendEmailCode(usuario);
             return ResponseEntity.ok(new MessageResponse("Código enviado por email"));
+        } catch (RuntimeException e) {
+            // Verificar si es el error de código ya existente
+            if (e.getMessage().contains("Ya existe un código válido")) {
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                        .body(new ErrorResponse("CODIGO_EXISTENTE", e.getMessage()));
+            } else if (e.getMessage().contains("excedido el límite")) {
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                        .body(new ErrorResponse("LIMITE_EXCEDIDO", e.getMessage()));
+            } else {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(new ErrorResponse("ERROR_ENVIO", e.getMessage()));
+            }
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new ErrorResponse("ERROR_ENVIO", e.getMessage()));
