@@ -209,9 +209,6 @@ public class TwoFactorAuthService {
      * Valida el código de doble autenticación según el tipo configurado
      */
     public boolean validateTwoFactorCode(Usuario usuario, String codigo) {
-        if (usuario.getDobleAutenticacion() == null || !usuario.getDobleAutenticacion()) {
-            return true; // Si no tiene 2FA habilitado, siempre válido
-        }
 
         // Verificar límite de intentos
         if (hasExceededAttemptLimit(usuario, TIPO_EMAIL_CODE)) {
