@@ -53,11 +53,12 @@ public class SolicitudController {
     public ResponseEntity<Void> registrarDescarga(
             @PathVariable("solicitudId") Integer solicitudId,
             @RequestParam("usuarioId") Integer usuarioId,
+            @RequestParam(value = "tipoDescarga", defaultValue = "DESCARGAR") String tipoDescarga,
             @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
 
-        log.info("Registrar descarga - CorrelationId: {}, Solicitud: {}, Usuario: {}",
-                correlationId, solicitudId, usuarioId);
-        solicitudService.registrarDescarga(solicitudId, usuarioId);
+        log.info("Registrar descarga - CorrelationId: {}, Solicitud: {}, Usuario: {}, Tipo: {}",
+                correlationId, solicitudId, usuarioId, tipoDescarga);
+        solicitudService.registrarDescarga(solicitudId, usuarioId, tipoDescarga);
         return ResponseEntity.ok().build();
     }
 

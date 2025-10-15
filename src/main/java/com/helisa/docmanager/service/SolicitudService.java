@@ -473,12 +473,33 @@ public class SolicitudService {
 
     // Registrar evento de descarga por parte de un usuario
     @Transactional
-    public void registrarDescarga(Integer solicitudId, Integer usuarioId) {
+    public void registrarDescarga(Integer solicitudId, Integer usuarioId, String tipoDescarga) {
         Solicitud solicitud = solicitudRepository.findById(solicitudId)
                 .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
 
-        crearHistorial(solicitud, usuarioId, SolicitudHistorial.AccionEnum.DESCARGAR,
-                "Usuario " + usuarioId + " descargó archivos de la solicitud");
+        SolicitudHistorial.AccionEnum accion;
+        String comentario;
+
+        switch (tipoDescarga.toUpperCase()) {
+            case "DESCARGAR_ARCHIVO_PRINCIPAL":
+                accion = SolicitudHistorial.AccionEnum.DESCARGAR_ARCHIVO_PRINCIPAL;
+                comentario = "Usuario " + usuarioId + " descargó el archivo principal de la solicitud";
+                break;
+            case "DESCARGAR_ADJUNTOS":
+                accion = SolicitudHistorial.AccionEnum.DESCARGAR_ADJUNTOS;
+                comentario = "Usuario " + usuarioId + " descargó adjuntos de la solicitud";
+                break;
+            case "DESCARGAR_COMPLETA":
+                accion = SolicitudHistorial.AccionEnum.DESCARGAR_COMPLETA;
+                comentario = "Usuario " + usuarioId + " descargó todos los archivos de la solicitud (ZIP completo)";
+                break;
+            default:
+                accion = SolicitudHistorial.AccionEnum.DESCARGAR;
+                comentario = "Usuario " + usuarioId + " descargó archivos de la solicitud";
+                break;
+        }
+
+        crearHistorial(solicitud, usuarioId, accion, comentario);
     }
 
 
