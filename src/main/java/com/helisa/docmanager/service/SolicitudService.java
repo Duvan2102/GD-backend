@@ -482,7 +482,7 @@ public class SolicitudService {
 
         switch (tipoDescarga.toUpperCase()) {
             case "DESCARGAR_ARCHIVO_PRINCIPAL":
-                accion = SolicitudHistorial.AccionEnum.DESCARGAR_ARCHIVO_PRINCIPAL;
+                accion = SolicitudHistorial.AccionEnum.DESCARGAR_PRINCIPAL;
                 comentario = "Usuario " + usuarioId + " descargó el archivo principal de la solicitud";
                 break;
             case "DESCARGAR_ADJUNTOS":
