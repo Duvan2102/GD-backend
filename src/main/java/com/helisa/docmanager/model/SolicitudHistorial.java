@@ -26,6 +26,11 @@ public class SolicitudHistorial {
     @Column(name = "actor_usuario_id")
     private Integer actorUsuarioId;
 
+    // Relación JPA para obtener el usuario completo (incluyendo nombre)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "actor_usuario_id", insertable = false, updatable = false)
+    private Usuario actorUsuario;
+
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "accion", nullable = false, length = 20)
@@ -43,7 +48,6 @@ public class SolicitudHistorial {
         DESCARGAR_PRINCIPAL, DESCARGAR_ADJUNTOS, DESCARGAR_COMPLETA
     }
 
-    // Factory methods
     public static SolicitudHistorial crear(Solicitud solicitud, Integer usuarioId, AccionEnum accion, String comentario) {
         SolicitudHistorial historial = new SolicitudHistorial();
         historial.setSolicitud(solicitud);
@@ -64,5 +68,14 @@ public class SolicitudHistorial {
 
     public static SolicitudHistorial rechazar(Solicitud solicitud, Integer usuarioId, String comentario) {
         return crear(solicitud, usuarioId, AccionEnum.RECHAZAR, comentario);
+    }
+
+    // Métodos de utilidad para obtener información del usuario
+    public String getNombreUsuario() {
+        return actorUsuario != null ? actorUsuario.getUsuario() : "Usuario " + actorUsuarioId;
+    }
+
+    public String getUsuarioLogin() {
+        return actorUsuario != null ? actorUsuario.getUsuario() : null;
     }
 }

@@ -249,11 +249,12 @@ public class SolicitudService {
                 .collect(Collectors.toList());
 
         List<HistorialResponse> historial = historialRepository
-                .findBySolicitudIdOrderByFechaAsc(solicitud.getId().longValue())
+                .findBySolicitudIdOrderByFechaAscWithUsuario(solicitud.getId().longValue())
                 .stream()
                 .map(h -> HistorialResponse.builder()
                         .id(h.getId())
                         .actorUsuarioId(h.getActorUsuarioId())
+                        .nombreUsuario(h.getNombreUsuario()) // Ahora incluye el nombre
                         .accion(h.getAccion().name())
                         .comentario(h.getComentario())
                         .fecha(h.getFecha())

@@ -31,4 +31,16 @@ public interface SolicitudHistorialRepository extends JpaRepository<SolicitudHis
 	@Query("SELECT h FROM SolicitudHistorial h WHERE h.solicitud.id = :solicitudId ORDER BY h.fecha ASC")
 	List<SolicitudHistorial> findBySolicitudIdOrderByFechaAsc(@Param("solicitudId") Long solicitudId);
 
+	// Métodos que cargan la relación con el usuario para obtener nombres
+	@Query("SELECT h FROM SolicitudHistorial h JOIN FETCH h.actorUsuario WHERE h.solicitud.id = :solicitudId ORDER BY h.fecha DESC")
+	List<SolicitudHistorial> findBySolicitudIdWithUsuario(@Param("solicitudId") Integer solicitudId);
+
+	@Query("SELECT h FROM SolicitudHistorial h JOIN FETCH h.actorUsuario WHERE h.solicitud.id = :solicitudId ORDER BY h.fecha ASC")
+	List<SolicitudHistorial> findBySolicitudIdOrderByFechaAscWithUsuario(@Param("solicitudId") Long solicitudId);
+
+	@Query("SELECT h FROM SolicitudHistorial h JOIN FETCH h.actorUsuario WHERE h.actorUsuarioId = :usuarioId ORDER BY h.fecha DESC")
+	Page<SolicitudHistorial> findByActorUsuarioIdWithUsuario(
+			@Param("usuarioId") Integer usuarioId,
+			Pageable pageable);
+
 }

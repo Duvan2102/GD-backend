@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 public class HistorialResponse {
     private Long id;
     private Integer actorUsuarioId;
+    private String nombreUsuario; // Campo 'usuario' del modelo Usuario (login)
     private String accion;
     private String comentario;
     private LocalDateTime fecha;
