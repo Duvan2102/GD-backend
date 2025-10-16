@@ -40,7 +40,7 @@ public class SolicitudHistorial {
 
     public enum AccionEnum {
         CREAR, APROBAR, RECHAZAR, CANCELAR, ADJUNTAR, DESCARGAR,
-        DESCARGAR_ARCHIVO_PRINCIPAL, DESCARGAR_ADJUNTOS, DESCARGAR_COMPLETA
+        DESC_PDF, DESC_ADJ, DESC_ZIP
     }
 
     // Factory methods
