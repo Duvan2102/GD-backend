@@ -482,18 +482,15 @@ public class SolicitudService {
 
         switch (tipoDescarga.toUpperCase()) {
             case "DESCARGAR_ARCHIVO_PRINCIPAL":
-            case "DESC_PDF":
-                accion = SolicitudHistorial.AccionEnum.DESC_PDF;
+                accion = SolicitudHistorial.AccionEnum.DESCARGAR_ARCHIVO_PRINCIPAL;
                 comentario = "Usuario " + usuarioId + " descargó el archivo principal de la solicitud";
                 break;
             case "DESCARGAR_ADJUNTOS":
-            case "DESC_ADJ":
-                accion = SolicitudHistorial.AccionEnum.DESC_ADJ;
+                accion = SolicitudHistorial.AccionEnum.DESCARGAR_ADJUNTOS;
                 comentario = "Usuario " + usuarioId + " descargó adjuntos de la solicitud";
                 break;
             case "DESCARGAR_COMPLETA":
-            case "DESC_ZIP":
-                accion = SolicitudHistorial.AccionEnum.DESC_ZIP;
+                accion = SolicitudHistorial.AccionEnum.DESCARGAR_COMPLETA;
                 comentario = "Usuario " + usuarioId + " descargó todos los archivos de la solicitud (ZIP completo)";
                 break;
             default:
