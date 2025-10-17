@@ -472,11 +472,15 @@ public class SolicitudService {
         historialRepository.save(historial);
     }
 
-    // Registrar evento de descarga por parte de un usuario
     @Transactional
     public void registrarDescarga(Integer solicitudId, Integer usuarioId, String tipoDescarga) {
         Solicitud solicitud = solicitudRepository.findById(solicitudId)
                 .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
+
+        Usuario usuario = usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
+        
+        String nombreUsuario = usuario.getUsuario(); 
 
         SolicitudHistorial.AccionEnum accion;
         String comentario;
@@ -484,19 +488,19 @@ public class SolicitudService {
         switch (tipoDescarga.toUpperCase()) {
             case "DESCARGAR_ARCHIVO_PRINCIPAL":
                 accion = SolicitudHistorial.AccionEnum.DESCARGAR_PRINCIPAL;
-                comentario = "Usuario " + usuarioId + " descargó el archivo principal de la solicitud";
+                comentario = "Usuario " + nombreUsuario + " descargó el archivo principal de la solicitud";
                 break;
             case "DESCARGAR_ADJUNTOS":
                 accion = SolicitudHistorial.AccionEnum.DESCARGAR_ADJUNTOS;
-                comentario = "Usuario " + usuarioId + " descargó adjuntos de la solicitud";
+                comentario = "Usuario " + nombreUsuario + " descargó adjuntos de la solicitud";
                 break;
             case "DESCARGAR_COMPLETA":
                 accion = SolicitudHistorial.AccionEnum.DESCARGAR_COMPLETA;
-                comentario = "Usuario " + usuarioId + " descargó todos los archivos de la solicitud (ZIP completo)";
+                comentario = "Usuario " + nombreUsuario + " descargó todos los archivos de la solicitud (ZIP completo)";
                 break;
             default:
                 accion = SolicitudHistorial.AccionEnum.DESCARGAR;
-                comentario = "Usuario " + usuarioId + " descargó archivos de la solicitud";
+                comentario = "Usuario " + nombreUsuario + " descargó archivos de la solicitud";
                 break;
         }
 
