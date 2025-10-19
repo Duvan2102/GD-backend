@@ -222,6 +222,68 @@ public class EmailService {
     }
 
     /**
+     * Envía notificación de nueva solicitud creada a los aprobadores
+     * @param email Email del destinatario
+     * @param numeroSolicitud Número/ID de la solicitud
+     * @param nombreSolicitud Nombre de la solicitud
+     * @param nombreSolicitante Nombre del solicitante
+     * @param esOrdenSecuencial Si la solicitud requiere orden secuencial
+     * @param esSiguienteAprobador Si este usuario es el siguiente en aprobar (solo aplica si es orden secuencial)
+     */
+    public void enviarNotificacionNuevaSolicitud(String email, Integer numeroSolicitud, 
+                                                String nombreSolicitud, String nombreSolicitante,
+                                                boolean esOrdenSecuencial, boolean esSiguienteAprobador) {
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(fromEmail);
+            message.setTo(email);
+            message.setSubject("Nueva Solicitud Pendiente - Helisa Document Manager");
+
+            String tipoAprobacion;
+            String instrucciones;
+            
+            if (esOrdenSecuencial) {
+                if (esSiguienteAprobador) {
+                    tipoAprobacion = "APROBACIÓN SECUENCIAL - Es su turno";
+                    instrucciones = "Esta solicitud requiere aprobación en orden secuencial. Usted es el siguiente en la cola de aprobación.";
+                } else {
+                    tipoAprobacion = "APROBACIÓN SECUENCIAL - En espera";
+                    instrucciones = "Esta solicitud requiere aprobación en orden secuencial. Su turno llegará cuando los aprobadores anteriores hayan completado su revisión.";
+                }
+            } else {
+                tipoAprobacion = "APROBACIÓN SIMULTÁNEA";
+                instrucciones = "Esta solicitud puede ser aprobada por todos los destinatarios simultáneamente.";
+            }
+
+            String body = String.format(
+                "Hola,\n\n" +
+                "Se ha creado una nueva solicitud que requiere su revisión:\n\n" +
+                "• Número de Solicitud: %d\n" +
+                "• Nombre: %s\n" +
+                "• Solicitante: %s\n" +
+                "• Tipo de Aprobación: %s\n\n" +
+                "%s\n\n" +
+                "Para revisar y gestionar esta solicitud, por favor acceda al sistema:\n" +
+                "%s\n\n" +
+                "Saludos,\n" +
+                "Equipo Helisa Document Manager",
+                numeroSolicitud,
+                nombreSolicitud != null ? nombreSolicitud : "Sin nombre",
+                nombreSolicitante != null ? nombreSolicitante : "Usuario",
+                tipoAprobacion,
+                instrucciones,
+                frontendUrl
+            );
+
+            message.setText(body);
+            mailSender.send(message);
+
+        } catch (Exception e) {
+            throw new RuntimeException("Error al enviar notificación de nueva solicitud: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Genera un token simple para restablecimiento de contraseña
      * En un entorno de producción, esto debería ser más seguro
      * @param usuario Usuario para el cual generar el token

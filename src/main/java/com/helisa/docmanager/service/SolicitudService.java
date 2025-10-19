@@ -45,6 +45,8 @@ public class SolicitudService {
     private EstadoRepository estadoRepository;
     @Autowired
     private UsuarioRepository usuarioRepository;
+    @Autowired
+    private EmailService emailService;
 
     @Value("${storage.max-pdf-bytes:52428800}")
     private long maxPdfBytes;
@@ -98,6 +100,9 @@ public class SolicitudService {
                     SolicitudHistorial.AccionEnum.CREAR,
                     request.getComentarioInicial() != null ?
                             request.getComentarioInicial() : "Solicitud creada");
+
+            // Enviar notificaciones a los aprobadores
+            enviarNotificacionesNuevaSolicitud(solicitud);
 
             log.info("Solicitud creada exitosamente: {}", solicitud.getId());
             return mapearADetalle(solicitud);
@@ -470,6 +475,95 @@ public class SolicitudService {
                                 SolicitudHistorial.AccionEnum accion, String comentario) {
         SolicitudHistorial historial = SolicitudHistorial.crear(solicitud, usuarioId, accion, comentario);
         historialRepository.save(historial);
+    }
+
+    /**
+     * Envía notificaciones por correo a los aprobadores cuando se crea una nueva solicitud
+     * @param solicitud La solicitud recién creada
+     */
+    private void enviarNotificacionesNuevaSolicitud(Solicitud solicitud) {
+        try {
+            // Obtener todos los destinatarios de la solicitud
+            List<SolicitudDestinatario> destinatarios = destinatarioRepository
+                    .findBySolicitudId(solicitud.getId());
+
+            if (destinatarios.isEmpty()) {
+                log.warn("No hay destinatarios para notificar en solicitud {}", solicitud.getId());
+                return;
+            }
+
+            // Obtener información del solicitante
+            Usuario solicitante = usuarioRepository.findById(solicitud.getIdSolicitante()).orElse(null);
+            String nombreSolicitante = solicitante != null ? 
+                    Stream.of(solicitante.getNombres(), solicitante.getApellidos())
+                            .filter(Objects::nonNull)
+                            .map(String::trim)
+                            .filter(str -> !str.isEmpty())
+                            .collect(Collectors.joining(" ")) : "Usuario";
+
+            // Obtener información de todos los destinatarios
+            List<Integer> idsDestinatarios = destinatarios.stream()
+                    .map(SolicitudDestinatario::getUsuarioId)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            Map<Integer, Usuario> usuariosDestinatarios = usuarioRepository.findByIdUsuarioIn(idsDestinatarios)
+                    .stream()
+                    .collect(Collectors.toMap(Usuario::getIdUsuario, Function.identity()));
+
+            boolean esOrdenSecuencial = Boolean.TRUE.equals(solicitud.getOrdenFirmaBoolean());
+
+            if (esOrdenSecuencial) {
+                // Para orden secuencial, solo notificar al primer aprobador
+                SolicitudDestinatario primerAprobador = destinatarios.stream()
+                        .min(Comparator.comparing(SolicitudDestinatario::getOrdenIndex))
+                        .orElse(null);
+
+                if (primerAprobador != null) {
+                    Usuario usuario = usuariosDestinatarios.get(primerAprobador.getUsuarioId());
+                    if (usuario != null && usuario.getCorreoEmpresarial() != null && 
+                        !usuario.getCorreoEmpresarial().trim().isEmpty()) {
+                        
+                        emailService.enviarNotificacionNuevaSolicitud(
+                                usuario.getCorreoEmpresarial(),
+                                solicitud.getId(),
+                                solicitud.getNombreSolicitud(),
+                                nombreSolicitante,
+                                true, // esOrdenSecuencial
+                                true  // esSiguienteAprobador
+                        );
+                        
+                        log.info("Notificación enviada al primer aprobador (usuario {}) para solicitud {}",
+                                primerAprobador.getUsuarioId(), solicitud.getId());
+                    }
+                }
+            } else {
+                // Para aprobación simultánea, notificar a todos los destinatarios
+                for (SolicitudDestinatario destinatario : destinatarios) {
+                    Usuario usuario = usuariosDestinatarios.get(destinatario.getUsuarioId());
+                    if (usuario != null && usuario.getCorreoEmpresarial() != null && 
+                        !usuario.getCorreoEmpresarial().trim().isEmpty()) {
+                        
+                        emailService.enviarNotificacionNuevaSolicitud(
+                                usuario.getCorreoEmpresarial(),
+                                solicitud.getId(),
+                                solicitud.getNombreSolicitud(),
+                                nombreSolicitante,
+                                false, // esOrdenSecuencial
+                                false  // esSiguienteAprobador
+                        );
+                    }
+                }
+                
+                log.info("Notificaciones enviadas a {} destinatarios para solicitud {} (aprobación simultánea)",
+                        destinatarios.size(), solicitud.getId());
+            }
+
+        } catch (Exception e) {
+            log.error("Error al enviar notificaciones de nueva solicitud {}: {}", 
+                    solicitud.getId(), e.getMessage(), e);
+            // No lanzar excepción para evitar que falle la creación de la solicitud
+        }
     }
 
     @Transactional
