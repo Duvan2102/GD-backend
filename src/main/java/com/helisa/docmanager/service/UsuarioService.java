@@ -70,6 +70,14 @@ public class UsuarioService {
         }
         usuario.setPassword(passwordEncoder.encode(usuario.getPassword()));
 
+        // Establecer método 2FA predeterminado: Google Auth
+        if (usuario.getTokenQr() == null) {
+            usuario.setTokenQr(true);
+        }
+        if (usuario.getTokenCorreo() == null) {
+            usuario.setTokenCorreo(false);
+        }
+
         return usuarioRepository.save(usuario);
     }
 
@@ -184,7 +192,13 @@ public class UsuarioService {
         usuario.setTelefono1(usuarioActualizado.getTelefono1());
         usuario.setTelefono2(usuarioActualizado.getTelefono2());
         usuario.setDireccion(usuarioActualizado.getDireccion());
-        usuario.setDobleAutenticacion(usuarioActualizado.getDobleAutenticacion());
+        // Actualizar método 2FA si se proporciona
+        if (usuarioActualizado.getTokenQr() != null) {
+            usuario.setTokenQr(usuarioActualizado.getTokenQr());
+        }
+        if (usuarioActualizado.getTokenCorreo() != null) {
+            usuario.setTokenCorreo(usuarioActualizado.getTokenCorreo());
+        }
 
         return usuarioRepository.save(usuario);
     }

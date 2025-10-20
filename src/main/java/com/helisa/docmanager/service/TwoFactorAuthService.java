@@ -206,31 +206,50 @@ public class TwoFactorAuthService {
     }
 
     /**
-     * Valida el código de doble autenticación según el tipo configurado
+     * Valida el código de doble autenticación según el método configurado en el usuario
      */
     public boolean validateTwoFactorCode(Usuario usuario, String codigo) {
-
         // Verificar límite de intentos
         if (hasExceededAttemptLimit(usuario, TIPO_EMAIL_CODE)) {
             throw new RuntimeException("Has excedido el límite de intentos. Intenta más tarde.");
         }
 
-        // Obtener el secreto de Google Auth del usuario
+        // Determinar método de autenticación según configuración del usuario
+        if (usuario.getTokenQr() != null && usuario.getTokenQr()) {
+            // Usuario usa Google Authenticator
+            return validarCodigoGoogleAuth(usuario, codigo);
+        } else if (usuario.getTokenCorreo() != null && usuario.getTokenCorreo()) {
+            // Usuario usa código de email
+            return validarCodigoEmail(usuario, codigo);
+        } else {
+            throw new RuntimeException("Usuario no tiene método de 2FA configurado");
+        }
+    }
+
+    /**
+     * Valida específicamente un código de Google Authenticator
+     */
+    public boolean validarCodigoGoogleAuth(Usuario usuario, String codigo) {
         LocalDateTime now = LocalDateTime.now();
         var googleSecret = tokenRepository.findValidTokenByUsuarioAndTipo(usuario, TIPO_GOOGLE_AUTH_SECRET, now);
         
-        if (googleSecret.isPresent()) {
-            // Validar con Google Authenticator
-            try {
-                int code = Integer.parseInt(codigo);
-                return validateGoogleAuthCode(googleSecret.get().getCodigo(), code);
-            } catch (NumberFormatException e) {
-                return false;
-            }
-        } else {
-            // Validar con código de email
-            return validateEmailCode(codigo, usuario);
+        if (!googleSecret.isPresent()) {
+            throw new RuntimeException("Google Authenticator no está configurado para este usuario");
         }
+        
+        try {
+            int code = Integer.parseInt(codigo);
+            return validateGoogleAuthCode(googleSecret.get().getCodigo(), code);
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Valida específicamente un código de email
+     */
+    public boolean validarCodigoEmail(Usuario usuario, String codigo) {
+        return validateEmailCode(codigo, usuario);
     }
 
     private boolean hasExceededAttemptLimit(Usuario usuario, String tipo) {
@@ -258,7 +277,7 @@ public class TwoFactorAuthService {
                 .forEach(tokenRepository::delete);
         
         // Actualizar el usuario
-        usuario.setDobleAutenticacion(false);
+        // Este método ya no se usa - 2FA es obligatorio\n        throw new RuntimeException(\"La doble autenticación es obligatoria y no se puede deshabilitar\");
     }
 
     /**
@@ -313,5 +332,30 @@ public class TwoFactorAuthService {
         }
         
         return false;
+    }
+
+    /**
+     * Activa el método de autenticación por Email y desactiva Google Auth
+     */
+    public void activarMetodoEmail(Usuario usuario) {
+        usuario.setTokenCorreo(true);
+        usuario.setTokenQr(false);
+        
+        // Eliminar tokens de Google Auth si existen
+        tokenRepository.deleteByUsuarioAndTipo(usuario.getUsuario(), TIPO_GOOGLE_AUTH_SECRET);
+        tokenRepository.deleteByUsuarioAndTipo(usuario.getUsuario(), TIPO_GOOGLE_AUTH_PENDING);
+    }
+
+    /**
+     * Activa el método de autenticación por Google Auth y desactiva Email
+     */
+    public void activarMetodoGoogleAuth(Usuario usuario) {
+        usuario.setTokenQr(true);
+        usuario.setTokenCorreo(false);
+        
+        // Limpiar tokens de email si existen
+        var tokensEmail = tokenRepository.findValidTokensByUsuarioAndTipoOrderByFechaExpDesc(
+            usuario, TIPO_EMAIL_CODE, LocalDateTime.now());
+        tokensEmail.forEach(tokenRepository::delete);
     }
 }

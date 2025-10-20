@@ -80,12 +80,7 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Integer> {
      */
     Optional<Usuario> findByCorreoPersonal(String correoPersonal);
 
-    /**
-     * Buscar usuarios que tengan doble autenticación habilitada
-     * @param dobleAutenticacion Estado de doble autenticación
-     * @return Lista de usuarios con doble autenticación habilitada/deshabilitada
-     */
-    List<Usuario> findByDobleAutenticacion(Boolean dobleAutenticacion);
+    // Método eliminado: findByDobleAutenticacion - 2FA es obligatorio para todos
 
     /**
      * Buscar usuarios por nombre completo (nombres + apellidos)

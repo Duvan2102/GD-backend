@@ -5,8 +5,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
-import lombok.Getter;
-import lombok.Setter;
 import lombok.ToString;
 
 import java.util.List;
@@ -55,7 +53,14 @@ public class Usuario {
     private String telefono2;
     private String direccion;
 
-    private Boolean dobleAutenticacion;
+    @NotNull
+    @Column(name = "token_correo", nullable = false)
+    private Boolean tokenCorreo = false;
+
+    @NotNull
+    @Column(name = "token_qr", nullable = false)
+    private Boolean tokenQr = true;
+
     @JsonIgnore
     @OneToMany(mappedBy = "usuario")
     private List<Token> tokens;
