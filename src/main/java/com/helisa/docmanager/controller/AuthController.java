@@ -1,10 +1,16 @@
 package com.helisa.docmanager.controller;
 
 import com.helisa.docmanager.security.JwtService;
+import com.helisa.docmanager.model.Cargo;
+import com.helisa.docmanager.model.Estado;
 import com.helisa.docmanager.model.RevokedToken;
+import com.helisa.docmanager.model.Rol;
 import com.helisa.docmanager.model.Usuario;
 import com.helisa.docmanager.model.Tipologia;
+import com.helisa.docmanager.repository.CargoRepository;
+import com.helisa.docmanager.repository.EstadoRepository;
 import com.helisa.docmanager.repository.RevokedTokenRepository;
+import com.helisa.docmanager.repository.RolRepository;
 import com.helisa.docmanager.repository.UsuarioRepository;
 import com.helisa.docmanager.repository.TipologiaRepository;
 import com.helisa.docmanager.service.TwoFactorAuthService;
@@ -139,24 +145,24 @@ public class AuthController {
             nuevoUsuario.setTelefono1(request.getTelefono1());
             nuevoUsuario.setTelefono2(request.getTelefono2());
             nuevoUsuario.setDireccion(request.getDireccion());
-            // Establecer Google Auth como método predeterminado\n            nuevoUsuario.setTokenQr(true);\n            nuevoUsuario.setTokenCorreo(false);
+          
 
-            // Establecer cargo por defecto (necesitamos un cargo por defecto)
-            // Por ahora usaremos el primer cargo disponible, pero esto debería ser configurable
-            com.helisa.docmanager.repository.CargoRepository cargoRepository = usuarioService.getCargoRepository();
-            com.helisa.docmanager.model.Cargo cargoDefault = cargoRepository.findAll().stream().findFirst()
-                    .orElseThrow(() -> new RuntimeException("No hay cargos disponibles en el sistema"));
-            nuevoUsuario.setCargo(cargoDefault);
+            
+            // Establecer cargo enviado por el usuario
+            CargoRepository cargoRepository = usuarioService.getCargoRepository();
+            Cargo cargoSeleccionado = cargoRepository.findById(request.getCargoId())
+                    .orElseThrow(() -> new RuntimeException("Cargo con ID " + request.getCargoId() + " no encontrado"));
+            nuevoUsuario.setCargo(cargoSeleccionado);
 
-            // Establecer rol por defecto (necesitamos un rol por defecto)
-            com.helisa.docmanager.repository.RolRepository rolRepository = usuarioService.getRolRepository();
-            com.helisa.docmanager.model.Rol rolDefault = rolRepository.findAll().stream().findFirst()
-                    .orElseThrow(() -> new RuntimeException("No hay roles disponibles en el sistema"));
+            // Establecer rol por defecto con ID 2
+            RolRepository rolRepository = usuarioService.getRolRepository();
+            Rol rolDefault = rolRepository.findById(2)
+                    .orElseThrow(() -> new RuntimeException("Rol con ID 2 no encontrado en el sistema"));
             nuevoUsuario.setRol(rolDefault);
 
             // Establecer estado PENDIENTE
-            com.helisa.docmanager.repository.EstadoRepository estadoRepository = usuarioService.getEstadoRepository();
-            com.helisa.docmanager.model.Estado estadoPendiente = estadoRepository.findByDescripcion("PENDIENTE")
+            EstadoRepository estadoRepository = usuarioService.getEstadoRepository();
+            Estado estadoPendiente = estadoRepository.findByDescripcion("PENDIENTE")
                     .orElseThrow(() -> new RuntimeException("Estado PENDIENTE no encontrado en la base de datos"));
             nuevoUsuario.setEstado(estadoPendiente);
 
@@ -757,6 +763,7 @@ public class AuthController {
         private String telefono1;
         private String telefono2;
         private String direccion;
+        private Integer cargoId;
     }
 
     @Data
