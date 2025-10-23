@@ -47,6 +47,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth/send-email-code").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/confirm-google-auth").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/2fa-status/*").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/password/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/auth/password/*").permitAll()
                         
                         // Endpoints públicos de recuperación de contraseña
                         .requestMatchers(HttpMethod.POST, "/api/password-reset/request").permitAll()
