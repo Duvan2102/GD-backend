@@ -3,6 +3,8 @@ package com.helisa.docmanager.controller;
 import com.helisa.docmanager.model.Usuario;
 import com.helisa.docmanager.service.PasswordResetService;
 import jakarta.validation.Valid;
+import lombok.Data;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,35 +18,25 @@ public class PasswordResetController {
     @Autowired
     private PasswordResetService passwordResetService;
 
-    /**
-     * Solicita restablecimiento de contraseña
-     * @param request Solicitud con el correo electrónico
-     * @return Respuesta indicando si se envió el correo
-     */
     @PostMapping("/request-reset")
     public ResponseEntity<?> solicitarRestablecimiento(@Valid @RequestBody PasswordResetRequest request) {
         try {
-            boolean enviado = passwordResetService.solicitarRestablecimiento(request.getEmail());
-            
-            if (enviado) {
-                return ResponseEntity.ok(new MessageResponse(
-                    "Si el correo electrónico existe en nuestro sistema, recibirá instrucciones para restablecer su contraseña."));
-            } else {
-                // Por seguridad, siempre devolver el mismo mensaje
-                return ResponseEntity.ok(new MessageResponse(
-                    "Si el correo electrónico existe en nuestro sistema, recibirá instrucciones para restablecer su contraseña."));
+            if ((request.getEmail() == null || request.getEmail().trim().isEmpty()) && 
+                (request.getUsername() == null || request.getUsername().trim().isEmpty())) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(new ErrorResponse("CAMPOS_REQUERIDOS", "Debe proporcionar un correo electrónico o nombre de usuario"));
             }
+            
+            passwordResetService.solicitarRestablecimiento(request.getEmail(), request.getUsername());
+            
+            return ResponseEntity.ok(new MessageResponse(
+                "Si el correo electrónico o nombre de usuario existe en nuestro sistema, recibirá instrucciones para restablecer su contraseña."));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new ErrorResponse("ERROR_SOLICITUD", e.getMessage()));
         }
     }
 
-    /**
-     * Valida un token de restablecimiento
-     * @param token Token a validar
-     * @return true si el token es válido, false en caso contrario
-     */
     @GetMapping("/validate-token")
     public ResponseEntity<?> validarToken(@RequestParam String token) {
         try {
@@ -56,11 +48,6 @@ public class PasswordResetController {
         }
     }
 
-    /**
-     * Obtiene información del usuario asociado a un token
-     * @param token Token de restablecimiento
-     * @return Información del usuario
-     */
     @GetMapping("/user-info")
     public ResponseEntity<?> obtenerInformacionUsuario(@RequestParam String token) {
         try {
@@ -84,11 +71,6 @@ public class PasswordResetController {
         }
     }
 
-    /**
-     * Restablece la contraseña usando un token
-     * @param request Solicitud con el token y nueva contraseña
-     * @return Respuesta indicando si se restableció exitosamente
-     */
     @PostMapping("/reset")
     public ResponseEntity<?> restablecerPassword(@Valid @RequestBody PasswordResetConfirmRequest request) {
         try {
@@ -106,19 +88,19 @@ public class PasswordResetController {
         }
     }
 
-    // Clases de request y response
-    @lombok.Data
+    @Data
     public static class PasswordResetRequest {
         private String email;
+        private String username;
     }
 
-    @lombok.Data
+    @Data
     public static class PasswordResetConfirmRequest {
         private String token;
         private String newPassword;
     }
 
-    @lombok.Data
+    @Data
     public static class MessageResponse {
         private final String message;
         
@@ -127,13 +109,13 @@ public class PasswordResetController {
         }
     }
 
-    @lombok.Data
+    @Data
     public static class ErrorResponse {
         private final String code;
         private final String message;
     }
 
-    @lombok.Data
+    @Data
     public static class TokenValidationResponse {
         private final boolean valid;
         
@@ -142,7 +124,7 @@ public class PasswordResetController {
         }
     }
 
-    @lombok.Data
+    @Data
     public static class UserInfoResponse {
         private final Integer idUsuario;
         private final String nombres;

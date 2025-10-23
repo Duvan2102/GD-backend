@@ -26,29 +26,29 @@ public class PasswordResetService {
     // En un entorno de producción, esto debería ser una base de datos o cache distribuido
     private final Map<String, TokenInfo> resetTokens = new HashMap<>();
 
-    /**
-     * Solicita restablecimiento de contraseña
-     * @param email Correo electrónico del usuario
-     * @return true si se envió el correo, false si el usuario no existe
-     */
     @Transactional
-    public boolean solicitarRestablecimiento(String email) {
-        Optional<Usuario> usuarioOpt = usuarioRepository.findByCorreoEmpresarial(email);
+    public boolean solicitarRestablecimiento(String email, String username) {
+        Optional<Usuario> usuarioOpt = Optional.empty();
+        
+        if (email != null && !email.trim().isEmpty()) {
+            usuarioOpt = usuarioRepository.findByCorreoEmpresarial(email);
+        }
+        
+        if (usuarioOpt.isEmpty() && username != null && !username.trim().isEmpty()) {
+            usuarioOpt = usuarioRepository.findByUsuario(username);
+        }
         
         if (usuarioOpt.isEmpty()) {
-            return false; // No revelar si el usuario existe o no
+            return false;
         }
 
         Usuario usuario = usuarioOpt.get();
         
-        // Generar token de restablecimiento
         String token = generarTokenSeguro();
-        long expirationTime = System.currentTimeMillis() + (60 * 60 * 1000); // 1 hora
+        long expirationTime = System.currentTimeMillis() + (60 * 60 * 1000);
         
-        // Guardar token (en producción, usar base de datos)
         resetTokens.put(token, new TokenInfo(usuario.getIdUsuario(), expirationTime));
         
-        // Enviar correo
         emailService.enviarCorreoRestablecimiento(usuario, token);
         
         return true;
