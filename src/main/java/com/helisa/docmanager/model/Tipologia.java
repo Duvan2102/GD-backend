@@ -24,4 +24,37 @@ public class Tipologia {
     @JsonIgnore
     @OneToMany(mappedBy = "tipologia")
     private List<Solicitud> solicitudes;
+
+    // Getters y Setters
+    public Integer getIdTipologia() {
+        return idTipologia;
+    }
+
+    public void setIdTipologia(Integer idTipologia) {
+        this.idTipologia = idTipologia;
+    }
+
+    public String getDescripcion() {
+        return descripcion;
+    }
+
+    public void setDescripcion(String descripcion) {
+        this.descripcion = descripcion;
+    }
+
+    public Cargo getCargo() {
+        return cargo;
+    }
+
+    public void setCargo(Cargo cargo) {
+        this.cargo = cargo;
+    }
+
+    public List<Solicitud> getSolicitudes() {
+        return solicitudes;
+    }
+
+    public void setSolicitudes(List<Solicitud> solicitudes) {
+        this.solicitudes = solicitudes;
+    }
 }

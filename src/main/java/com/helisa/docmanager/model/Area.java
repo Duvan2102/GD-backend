@@ -24,4 +24,37 @@ public class Area {
     @JsonIgnore
     @OneToMany(mappedBy = "area")
     private List<Cargo> cargos;
+
+    // Getters y Setters
+    public Integer getIdArea() {
+        return idArea;
+    }
+
+    public void setIdArea(Integer idArea) {
+        this.idArea = idArea;
+    }
+
+    public String getDescripcion() {
+        return descripcion;
+    }
+
+    public void setDescripcion(String descripcion) {
+        this.descripcion = descripcion;
+    }
+
+    public Departamento getDepartamento() {
+        return departamento;
+    }
+
+    public void setDepartamento(Departamento departamento) {
+        this.departamento = departamento;
+    }
+
+    public List<Cargo> getCargos() {
+        return cargos;
+    }
+
+    public void setCargos(List<Cargo> cargos) {
+        this.cargos = cargos;
+    }
 }
