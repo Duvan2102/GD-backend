@@ -11,6 +11,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
+
 @Repository
 public interface SolicitudRepository extends JpaRepository<Solicitud, Integer> {
 
@@ -58,4 +60,10 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, Integer> {
 
     // Listar solicitudes pendientes que tengan periodicidad de recordatorio configurada (> 0)
     java.util.List<Solicitud> findByEstado_IdEstadoAndEnviarRecordatorioGreaterThan(Integer idEstado, Integer minValor);
+    
+    // Métodos para auditoría
+    Page<Solicitud> findByCreatedAtBetween(LocalDateTime fechaDesde, LocalDateTime fechaHasta, Pageable pageable);
+    Page<Solicitud> findByCreatedAtAfter(LocalDateTime fechaDesde, Pageable pageable);
+    Page<Solicitud> findByCreatedAtBefore(LocalDateTime fechaHasta, Pageable pageable);
+    Page<Solicitud> findByEstado(Estado estado, Pageable pageable);
 }
