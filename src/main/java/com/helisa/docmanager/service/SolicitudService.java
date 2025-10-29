@@ -824,42 +824,59 @@ public class SolicitudService {
             String comentario = h.getComentario() != null ? limpiarTexto(h.getComentario()) : "";
             String fecha = h.getFecha() != null ? h.getFecha().format(fmt) : "";
             
-            // Salto de página si es necesario
-            if (yStart < margin) {
+            // Dividir descripción en múltiples líneas si es necesario
+            List<String> lineasDescripcion = dividirTextoEnLineas(comentario, anchoDescripcion, font, 9);
+            
+            // Salto de página si es necesario (considerando las líneas adicionales de descripción)
+            float alturaNecesaria = leading * lineasDescripcion.size();
+            if (yStart - alturaNecesaria < margin) {
                 cs.endText();
                 cs.close();
-                page = new org.apache.pdfbox.pdmodel.PDPage();
+                page = new PDPage();
                 doc.addPage(page);
-                cs = new org.apache.pdfbox.pdmodel.PDPageContentStream(doc, page);
+                cs = new PDPageContentStream(doc, page);
                 yStart = page.getMediaBox().getHeight() - margin;
                 cs.setFont(font, 9);
             }
             
-            // Dibujar fila
-            cs.beginText();
-            cs.newLineAtOffset(margin, yStart);
-            
-            // Columna 1: Nombre
-            String nombreTruncado = truncarTexto(nombre, anchoNombre, font, 9);
-            cs.showText(nombreTruncado);
-            
-            // Columna 2: Acción
-            cs.newLineAtOffset(anchoNombre, 0);
-            String accionTruncada = truncarTexto(accion, anchoAccion, font, 9);
-            cs.showText(accionTruncada);
-            
-            // Columna 3: Fecha
-            cs.newLineAtOffset(anchoAccion, 0);
-            String fechaTruncada = truncarTexto(fecha, anchoFecha, font, 9);
-            cs.showText(fechaTruncada);
-            
-            // Columna 4: Descripción (permite truncar con "...")
-            cs.newLineAtOffset(anchoFecha, 0);
-            String descripcionTruncada = truncarTexto(comentario, anchoDescripcion, font, 9);
-            cs.showText(descripcionTruncada);
-            
-            cs.endText();
-            yStart -= leading;
+            // Dibujar las tres primeras columnas en cada línea de descripción
+            for (int i = 0; i < lineasDescripcion.size(); i++) {
+                cs.beginText();
+                cs.newLineAtOffset(margin, yStart);
+                
+                // Columna 1: Nombre (solo en la primera línea)
+                if (i == 0) {
+                    String nombreTruncado = truncarTexto(nombre, anchoNombre, font, 9);
+                    cs.showText(nombreTruncado);
+                }
+                
+                // Avanzar a la columna de acción
+                cs.newLineAtOffset(i == 0 ? anchoNombre : 0, 0);
+                
+                // Columna 2: Acción (solo en la primera línea)
+                if (i == 0) {
+                    String accionTruncada = truncarTexto(accion, anchoAccion, font, 9);
+                    cs.showText(accionTruncada);
+                }
+                
+                // Avanzar a la columna de fecha
+                cs.newLineAtOffset(i == 0 ? anchoAccion : 0, 0);
+                
+                // Columna 3: Fecha (solo en la primera línea)
+                if (i == 0) {
+                    String fechaTruncada = truncarTexto(fecha, anchoFecha, font, 9);
+                    cs.showText(fechaTruncada);
+                }
+                
+                // Avanzar a la columna de descripción
+                cs.newLineAtOffset(i == 0 ? anchoFecha : anchoNombre + anchoAccion + anchoFecha, 0);
+                
+                // Columna 4: Descripción (puede tener múltiples líneas)
+                cs.showText(lineasDescripcion.get(i));
+                
+                cs.endText();
+                yStart -= leading;
+            }
         }
 
         cs.close();
@@ -926,6 +943,67 @@ public class SolicitudService {
             }
             return texto;
         }
+    }
+
+    /**
+     * Divide un texto en múltiples líneas según el ancho máximo disponible
+     * Cada línea cabrá dentro del ancho especificado
+     */
+    private List<String> dividirTextoEnLineas(String texto, float anchoMaximo, org.apache.pdfbox.pdmodel.font.PDFont font, float fontSize) {
+        List<String> lineas = new ArrayList<>();
+        
+        if (texto == null || texto.isEmpty()) {
+            lineas.add("");
+            return lineas;
+        }
+        
+        try {
+            String[] palabras = texto.split("\\s+");
+            StringBuilder lineaActual = new StringBuilder();
+            
+            for (String palabra : palabras) {
+                String textoPrueba = lineaActual.length() == 0 ? palabra : lineaActual.toString() + " " + palabra;
+                float anchoTexto = font.getStringWidth(textoPrueba) / 1000 * fontSize;
+                
+                if (anchoTexto <= anchoMaximo) {
+                    if (lineaActual.length() > 0) {
+                        lineaActual.append(" ");
+                    }
+                    lineaActual.append(palabra);
+                } else {
+                    // La palabra no cabe, empezar nueva línea
+                    if (lineaActual.length() > 0) {
+                        lineas.add(lineaActual.toString());
+                        lineaActual = new StringBuilder();
+                    }
+                    // Si la palabra sola es demasiado larga, truncarla
+                    if (font.getStringWidth(palabra) / 1000 * fontSize > anchoMaximo) {
+                        palabra = truncarTexto(palabra, anchoMaximo, font, fontSize).replace("...", "");
+                    }
+                    lineaActual.append(palabra);
+                }
+            }
+            
+            // Agregar la última línea
+            if (lineaActual.length() > 0) {
+                lineas.add(lineaActual.toString());
+            } else if (lineas.isEmpty()) {
+                lineas.add("");
+            }
+            
+        } catch (Exception e) {
+            // Fallback: dividir por caracteres
+            int maxChars = (int) (anchoMaximo / (fontSize * 0.6f));
+            while (texto.length() > maxChars) {
+                lineas.add(texto.substring(0, maxChars));
+                texto = texto.substring(maxChars);
+            }
+            if (!texto.isEmpty() || lineas.isEmpty()) {
+                lineas.add(texto);
+            }
+        }
+        
+        return lineas;
     }
 
 
