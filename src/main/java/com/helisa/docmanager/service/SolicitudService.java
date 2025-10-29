@@ -696,7 +696,7 @@ public class SolicitudService {
                 .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
 
         List<SolicitudAdjunto> adjuntos = adjuntoRepository.findBySolicitudId(solicitudId);
-        List<SolicitudHistorial> historial = historialRepository.findBySolicitudIdOrderByFechaAsc(solicitudId.longValue());
+        List<SolicitudHistorial> historial = historialRepository.findBySolicitudIdOrderByFechaAscWithUsuario(solicitudId.longValue());
 
         // Generar PDF de log en memoria
         byte[] pdfLog = generarPdfLog(historial);
@@ -777,14 +777,18 @@ public class SolicitudService {
         cs.newLineAtOffset(0, -leading * 2);
 
         // Encabezados
-        cs.showText("Nombre / Acción / Fecha");
+        cs.showText("Nombre / Acción / Fecha / Descripción");
         cs.newLineAtOffset(0, -leading);
 
         java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
         for (SolicitudHistorial h : historial) {
-            String nombre = h.getActorUsuarioId() != null ? ("Usuario " + h.getActorUsuarioId()) : "Sistema";
-            String linea = nombre + " / " + h.getAccion().name() + " / " + (h.getFecha() != null ? h.getFecha().format(fmt) : "");
+            String nombre = h.getNombreUsuario() != null ? h.getNombreUsuario() : "Sistema";
+            String accion = h.getAccion() != null ? h.getAccion().name() : "";
+            String comentario = h.getComentario() != null ? h.getComentario() : "";
+            String fecha = h.getFecha() != null ? h.getFecha().format(fmt) : "";
+            
+            String linea = nombre + " / " + accion + " / " + fecha + " / " + comentario;
             cs.showText(linea);
             cs.newLineAtOffset(0, -leading);
         }
