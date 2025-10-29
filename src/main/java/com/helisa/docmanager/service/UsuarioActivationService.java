@@ -39,8 +39,6 @@ public class UsuarioActivationService {
         }
 
         boolean esPendiente = estadoActual.equals("PENDIENTE");
-        boolean esActivo = estadoActual.equals("ACTIVO");
-
         
         Estado estadoActivo = estadoRepository.findByDescripcion("ACTIVO")
                 .orElseThrow(() -> new RuntimeException("Estado ACTIVO no encontrado en la base de datos"));
@@ -48,19 +46,20 @@ public class UsuarioActivationService {
         usuario.setEstado(estadoActivo);
         Usuario usuarioActivado = usuarioRepository.save(usuario);
 
-            
+        // Enviar correo de activación cuando corresponde
         if (usuario.getCorreoEmpresarial() != null && !usuario.getCorreoEmpresarial().trim().isEmpty()) {
             try {
-                if (esPendiente || esActivo) {
-                    
+                if (esPendiente) {
+                    // Usuario PENDIENTE activado: enviar correo con token para crear contraseña
+                    // Reutiliza el método de restablecimiento de contraseña
                     String token = passwordResetService.generarTokenParaActivacion(usuario.getIdUsuario());
                     emailService.enviarCorreoActivacionConToken(usuario, token);
                 } else {
-                    
+                    // Usuario INACTIVO reactivado: enviar correo de reactivación
                     emailService.enviarCorreoReactivacion(usuario);
                 }
             } catch (Exception e) {
-            
+                // Log del error sin detener el proceso de activación
                 System.err.println("Error al enviar correo de activación: " + e.getMessage());
             }
         }

@@ -161,6 +161,12 @@ public class SolicitudService {
             crearHistorial(solicitud, request.getUsuarioId(),
                     SolicitudHistorial.AccionEnum.APROBAR,
                     "Solicitud aprobada por todos los destinatarios");
+        } else {
+            // Si aún quedan aprobadores y la solicitud tiene orden secuencial,
+            // notificar al siguiente aprobador
+            if (Boolean.TRUE.equals(solicitud.getOrdenFirmaBoolean())) {
+                notificarSiguienteAprobador(solicitud);
+            }
         }
 
         log.info("Solicitud {} aprobada por usuario {}", solicitudId, request.getUsuarioId());
@@ -612,6 +618,66 @@ public class SolicitudService {
             log.error("Error al enviar notificaciones de nueva solicitud {}: {}", 
                     solicitud.getId(), e.getMessage(), e);
             // No lanzar excepción para evitar que falle la creación de la solicitud
+        }
+    }
+
+    /**
+     * Notifica al siguiente aprobador en la cola cuando una solicitud con orden secuencial
+     * es aprobada por un aprobador anterior
+     * @param solicitud La solicitud que fue aprobada parcialmente
+     */
+    private void notificarSiguienteAprobador(Solicitud solicitud) {
+        try {
+            // Obtener el siguiente aprobador usando FlujoAprobacionService
+            SolicitudDestinatario siguienteAprobador = flujoService.obtenerSiguienteAprobador(solicitud.getId());
+            
+            if (siguienteAprobador == null) {
+                log.debug("No hay siguiente aprobador para notificar en solicitud {}", solicitud.getId());
+                return;
+            }
+
+            // Obtener información del usuario siguiente aprobador
+            Usuario usuarioAprobador = usuarioRepository.findById(siguienteAprobador.getUsuarioId()).orElse(null);
+            
+            if (usuarioAprobador == null) {
+                log.warn("Usuario siguiente aprobador no encontrado (ID: {}) para solicitud {}", 
+                        siguienteAprobador.getUsuarioId(), solicitud.getId());
+                return;
+            }
+
+            if (usuarioAprobador.getCorreoEmpresarial() == null || 
+                usuarioAprobador.getCorreoEmpresarial().trim().isEmpty()) {
+                log.warn("Usuario siguiente aprobador no tiene correo empresarial (ID: {}) para solicitud {}", 
+                        siguienteAprobador.getUsuarioId(), solicitud.getId());
+                return;
+            }
+
+            // Obtener información del solicitante
+            Usuario solicitante = usuarioRepository.findById(solicitud.getIdSolicitante()).orElse(null);
+            String nombreSolicitante = solicitante != null ? 
+                    Stream.of(solicitante.getNombres(), solicitante.getApellidos())
+                            .filter(Objects::nonNull)
+                            .map(String::trim)
+                            .filter(str -> !str.isEmpty())
+                            .collect(Collectors.joining(" ")) : "Usuario";
+
+            // Enviar notificación al siguiente aprobador
+            emailService.enviarNotificacionNuevaSolicitud(
+                    usuarioAprobador.getCorreoEmpresarial(),
+                    solicitud.getId(),
+                    solicitud.getNombreSolicitud(),
+                    nombreSolicitante,
+                    true, // esOrdenSecuencial
+                    true  // esSiguienteAprobador
+            );
+
+            log.info("Notificación enviada al siguiente aprobador (usuario {}) para solicitud {}",
+                    siguienteAprobador.getUsuarioId(), solicitud.getId());
+
+        } catch (Exception e) {
+            log.error("Error al notificar siguiente aprobador para solicitud {}: {}", 
+                    solicitud.getId(), e.getMessage(), e);
+            // No lanzar excepción para evitar que falle el proceso de aprobación
         }
     }
 

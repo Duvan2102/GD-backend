@@ -3,9 +3,18 @@ package com.helisa.docmanager.service;
 import com.helisa.docmanager.model.Usuario;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
+
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.stream.Stream;
+import java.util.stream.Collectors;
 
 @Service
 public class EmailService {
@@ -13,11 +22,39 @@ public class EmailService {
     @Autowired
     private JavaMailSender mailSender;
 
+    @Autowired
+    private TemplateEngine templateEngine;
+
     @Value("${app.frontend.url:http://localhost:3000}")
     private String frontendUrl;
 
     @Value("${spring.mail.username:noreply@helisa.com}")
     private String fromEmail;
+
+    /**
+     * Método auxiliar para enviar correos HTML usando plantillas Thymeleaf
+     * @param to Email del destinatario
+     * @param subject Asunto del correo
+     * @param templateName Nombre de la plantilla (sin extensión .html)
+     * @param context Contexto con las variables para la plantilla
+     */
+    private void enviarCorreoHtml(String to, String subject, String templateName, Context context) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            
+            helper.setFrom(fromEmail);
+            helper.setTo(to);
+            helper.setSubject(subject);
+            
+            String htmlContent = templateEngine.process("mailTempo/" + templateName, context);
+            helper.setText(htmlContent, true);
+            
+            mailSender.send(message);
+        } catch (MessagingException e) {
+            throw new RuntimeException("Error al enviar correo: " + e.getMessage(), e);
+        }
+    }
 
     /**
      * Envía correo de activación con token para que el usuario cree su contraseña
@@ -27,32 +64,25 @@ public class EmailService {
      */
     public void enviarCorreoActivacionConToken(Usuario usuario, String token) {
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(fromEmail);
-            message.setTo(usuario.getCorreoEmpresarial());
-            message.setSubject("Cuenta Activada - Helisa Document Manager");
+            String nombreCompleto = Stream.of(usuario.getNombres(), usuario.getApellidos())
+                    .filter(java.util.Objects::nonNull)
+                    .map(String::trim)
+                    .filter(str -> !str.isEmpty())
+                    .collect(Collectors.joining(" "));
             
-            String body = String.format(
-                "Hola %s %s,\n\n" +
-                "Su cuenta ha sido activada exitosamente en el sistema Helisa Document Manager.\n\n" +
-                "Para completar la configuración de su cuenta, debe establecer una contraseña.\n" +
-                "Haga clic en el siguiente enlace para crear su contraseña:\n\n" +
-                "%s/reset-password?token=%s\n\n" +
-                "Este enlace expirará en 24 horas.\n\n" +
-                "Usuario: %s\n\n" +
-                "Si no solicitó esta activación, por favor contacte al administrador del sistema.\n\n" +
-                "Saludos,\n" +
-                "Equipo Helisa",
-                usuario.getNombres(),
-                usuario.getApellidos(),
-                frontendUrl,
-                token,
-                usuario.getUsuario()
+            String resetPasswordUrl = frontendUrl + "/reset-password?token=" + token;
+            
+            Context context = new Context();
+            context.setVariable("nombreCompleto", nombreCompleto.isEmpty() ? "Usuario" : nombreCompleto);
+            context.setVariable("usuario", usuario.getUsuario());
+            context.setVariable("resetPasswordUrl", resetPasswordUrl);
+            
+            enviarCorreoHtml(
+                    usuario.getCorreoEmpresarial(),
+                    "Cuenta Activada - Helisa Document Manager",
+                    "activacion-con-token",
+                    context
             );
-            
-            message.setText(body);
-            mailSender.send(message);
-            
         } catch (Exception e) {
             throw new RuntimeException("Error al enviar correo de activación: " + e.getMessage(), e);
         }
@@ -64,28 +94,23 @@ public class EmailService {
      */
     public void enviarCorreoReactivacion(Usuario usuario) {
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(fromEmail);
-            message.setTo(usuario.getCorreoEmpresarial());
-            message.setSubject("Cuenta Reactivada - Helisa Document Manager");
+            String nombreCompleto = Stream.of(usuario.getNombres(), usuario.getApellidos())
+                    .filter(java.util.Objects::nonNull)
+                    .map(String::trim)
+                    .filter(str -> !str.isEmpty())
+                    .collect(Collectors.joining(" "));
             
-            String body = String.format(
-                "Hola %s %s,\n\n" +
-                "Su cuenta ha sido reactivada exitosamente en el sistema Helisa Document Manager.\n\n" +
-                "Ahora puede acceder nuevamente al sistema con sus credenciales anteriores.\n\n" +
-                "Usuario: %s\n\n" +
-                "Si desea cambiar su contraseña, puede hacerlo desde la opción de restablecer contraseña en la página de inicio de sesión.\n\n" +
-                "Si no solicitó esta reactivación, por favor contacte al administrador del sistema inmediatamente.\n\n" +
-                "Saludos,\n" +
-                "Equipo Helisa",
-                usuario.getNombres(),
-                usuario.getApellidos(),
-                usuario.getUsuario()
+            Context context = new Context();
+            context.setVariable("nombreCompleto", nombreCompleto.isEmpty() ? "Usuario" : nombreCompleto);
+            context.setVariable("usuario", usuario.getUsuario());
+            context.setVariable("frontendUrl", frontendUrl);
+            
+            enviarCorreoHtml(
+                    usuario.getCorreoEmpresarial(),
+                    "Cuenta Reactivada - Helisa Document Manager",
+                    "reactivacion",
+                    context
             );
-            
-            message.setText(body);
-            mailSender.send(message);
-            
         } catch (Exception e) {
             throw new RuntimeException("Error al enviar correo de reactivación: " + e.getMessage(), e);
         }
@@ -98,34 +123,8 @@ public class EmailService {
      */
     @Deprecated
     public void enviarCorreoActivacion(Usuario usuario) {
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(fromEmail);
-            message.setTo(usuario.getCorreoEmpresarial());
-            message.setSubject("Cuenta Activada - Helisa Document Manager");
-            
-            String body = String.format(
-                "Hola %s %s,\n\n" +
-                "Su cuenta ha sido activada exitosamente en el sistema Helisa Document Manager.\n\n" +
-                "Para completar la configuración de su cuenta, debe establecer una nueva contraseña.\n" +
-                "Haga clic en el siguiente enlace para restablecer su contraseña:\n\n" +
-                "%s/reset-password?token=%s\n\n" +
-                "Este enlace expirará en 24 horas.\n\n" +
-                "Si no solicitó esta activación, por favor ignore este correo.\n\n" +
-                "Saludos,\n" +
-                "Equipo Helisa",
-                usuario.getNombres(),
-                usuario.getApellidos(),
-                frontendUrl,
-                generarTokenRestablecimiento(usuario)
-            );
-            
-            message.setText(body);
-            mailSender.send(message);
-            
-        } catch (Exception e) {
-            throw new RuntimeException("Error al enviar correo de activación: " + e.getMessage(), e);
-        }
+        // Mantener compatibilidad pero redirigir al método nuevo
+        enviarCorreoActivacionConToken(usuario, generarTokenRestablecimiento(usuario));
     }
 
     /**
@@ -135,29 +134,24 @@ public class EmailService {
      */
     public void enviarCorreoRestablecimiento(Usuario usuario, String token) {
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(fromEmail);
-            message.setTo(usuario.getCorreoEmpresarial());
-            message.setSubject("Restablecer Contraseña - Helisa Document Manager");
+            String nombreCompleto = Stream.of(usuario.getNombres(), usuario.getApellidos())
+                    .filter(java.util.Objects::nonNull)
+                    .map(String::trim)
+                    .filter(str -> !str.isEmpty())
+                    .collect(Collectors.joining(" "));
             
-            String body = String.format(
-                "Hola %s %s,\n\n" +
-                "Ha solicitado restablecer su contraseña en el sistema Helisa Document Manager.\n\n" +
-                "Haga clic en el siguiente enlace para establecer una nueva contraseña:\n\n" +
-                "%s/reset-password?token=%s\n\n" +
-                "Este enlace expirará en 1 hora.\n\n" +
-                "Si no solicitó este restablecimiento, por favor ignore este correo.\n\n" +
-                "Saludos,\n" +
-                "Equipo Helisa",
-                usuario.getNombres(),
-                usuario.getApellidos(),
-                frontendUrl,
-                token
+            String resetPasswordUrl = frontendUrl + "/reset-password?token=" + token;
+            
+            Context context = new Context();
+            context.setVariable("nombreCompleto", nombreCompleto.isEmpty() ? "Usuario" : nombreCompleto);
+            context.setVariable("resetPasswordUrl", resetPasswordUrl);
+            
+            enviarCorreoHtml(
+                    usuario.getCorreoEmpresarial(),
+                    "Restablecer Contraseña - Helisa Document Manager",
+                    "restablecimiento-password",
+                    context
             );
-            
-            message.setText(body);
-            mailSender.send(message);
-            
         } catch (Exception e) {
             throw new RuntimeException("Error al enviar correo de restablecimiento: " + e.getMessage(), e);
         }
@@ -171,26 +165,17 @@ public class EmailService {
      */
     public void sendTwoFactorCode(String email, String codigo, String nombreCompleto) {
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(fromEmail);
-            message.setTo(email);
-            message.setSubject("Código de Verificación - Helisa Document Manager");
+            Context context = new Context();
+            context.setVariable("nombreCompleto", nombreCompleto != null && !nombreCompleto.trim().isEmpty() 
+                    ? nombreCompleto : "Usuario");
+            context.setVariable("codigo", codigo);
             
-            String body = String.format(
-                "Hola %s,\n\n" +
-                "Su código de verificación de dos factores es:\n\n" +
-                "%s\n\n" +
-                "Este código expirará en 10 minutos.\n\n" +
-                "Si no solicitó este código, por favor ignore este correo.\n\n" +
-                "Saludos,\n" +
-                "Equipo Helisa",
-                nombreCompleto,
-                codigo
+            enviarCorreoHtml(
+                    email,
+                    "Código de Verificación - Helisa Document Manager",
+                    "codigo-2fa",
+                    context
             );
-            
-            message.setText(body);
-            mailSender.send(message);
-            
         } catch (Exception e) {
             throw new RuntimeException("Error al enviar código de verificación: " + e.getMessage(), e);
         }
@@ -203,19 +188,16 @@ public class EmailService {
      */
     public void enviarRecordatorioSolicitud(String email, Integer numeroSolicitud) {
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(fromEmail);
-            message.setTo(email);
-            message.setSubject("Recordatorio de Solicitud - Helisa Document Manager");
-
-            String body = String.format(
-                "recuerda revisar la solicitud N° %d",
-                numeroSolicitud
+            Context context = new Context();
+            context.setVariable("numeroSolicitud", numeroSolicitud);
+            context.setVariable("frontendUrl", frontendUrl);
+            
+            enviarCorreoHtml(
+                    email,
+                    "Recordatorio de Solicitud - Helisa Document Manager",
+                    "recordatorio-solicitud",
+                    context
             );
-
-            message.setText(body);
-            mailSender.send(message);
-
         } catch (Exception e) {
             throw new RuntimeException("Error al enviar recordatorio de solicitud: " + e.getMessage(), e);
         }
@@ -234,11 +216,6 @@ public class EmailService {
                                                 String nombreSolicitud, String nombreSolicitante,
                                                 boolean esOrdenSecuencial, boolean esSiguienteAprobador) {
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(fromEmail);
-            message.setTo(email);
-            message.setSubject("Nueva Solicitud Pendiente - Helisa Document Manager");
-
             String tipoAprobacion;
             String instrucciones;
             
@@ -254,30 +231,23 @@ public class EmailService {
                 tipoAprobacion = "APROBACIÓN SIMULTÁNEA";
                 instrucciones = "Esta solicitud puede ser aprobada por todos los destinatarios simultáneamente.";
             }
-
-            String body = String.format(
-                "Hola,\n\n" +
-                "Se ha creado una nueva solicitud que requiere su revisión:\n\n" +
-                "• Número de Solicitud: %d\n" +
-                "• Nombre: %s\n" +
-                "• Solicitante: %s\n" +
-                "• Tipo de Aprobación: %s\n\n" +
-                "%s\n\n" +
-                "Para revisar y gestionar esta solicitud, por favor acceda al sistema:\n" +
-                "%s\n\n" +
-                "Saludos,\n" +
-                "Equipo Helisa Document Manager",
-                numeroSolicitud,
-                nombreSolicitud != null ? nombreSolicitud : "Sin nombre",
-                nombreSolicitante != null ? nombreSolicitante : "Usuario",
-                tipoAprobacion,
-                instrucciones,
-                frontendUrl
+            
+            Context context = new Context();
+            context.setVariable("numeroSolicitud", numeroSolicitud);
+            context.setVariable("nombreSolicitud", nombreSolicitud != null ? nombreSolicitud : "Sin nombre");
+            context.setVariable("nombreSolicitante", nombreSolicitante != null ? nombreSolicitante : "Usuario");
+            context.setVariable("tipoAprobacion", tipoAprobacion);
+            context.setVariable("instrucciones", instrucciones);
+            context.setVariable("esOrdenSecuencial", esOrdenSecuencial);
+            context.setVariable("esSiguienteAprobador", esSiguienteAprobador);
+            context.setVariable("frontendUrl", frontendUrl);
+            
+            enviarCorreoHtml(
+                    email,
+                    "Nueva Solicitud Pendiente - Helisa Document Manager",
+                    "nueva-solicitud",
+                    context
             );
-
-            message.setText(body);
-            mailSender.send(message);
-
         } catch (Exception e) {
             throw new RuntimeException("Error al enviar notificación de nueva solicitud: " + e.getMessage(), e);
         }
@@ -295,41 +265,32 @@ public class EmailService {
         return String.format("%d_%d", usuario.getIdUsuario(), timestamp);
     }
 
-	/**
- * Envía alerta de intentos de login sospechosos
- * @param email Email del usuario
- * @param nombreCompleto Nombre completo del usuario
- * @param ipAddress Dirección IP desde donde se intentó el login
- */
-public void sendLoginAttemptAlert(String email, String nombreCompleto, String ipAddress) {
-    try {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(fromEmail);
-        message.setTo(email);
-        message.setSubject("Alerta de Seguridad - Intentos de Login Sospechosos");
-        
-        String body = String.format(
-            "Hola %s,\n\n" +
-            "Hemos detectado múltiples intentos de login fallidos en su cuenta.\n\n" +
-            "Detalles del intento:\n" +
-            "- IP: %s\n" +
-            "- Fecha: %s\n\n" +
-            "Si no fue usted quien intentó acceder, por favor:\n" +
-            "1. Cambie su contraseña inmediatamente\n" +
-            "2. Revise la seguridad de su cuenta\n" +
-            "3. Contacte al administrador del sistema\n\n" +
-            "Saludos,\n" +
-            "Equipo de Seguridad Helisa",
-            nombreCompleto,
-            ipAddress,
-            java.time.LocalDateTime.now().toString()
-        );
-        
-        message.setText(body);
-        mailSender.send(message);
-        
-    } catch (Exception e) {
-        throw new RuntimeException("Error al enviar alerta de login: " + e.getMessage(), e);
+    /**
+     * Envía alerta de intentos de login sospechosos
+     * @param email Email del usuario
+     * @param nombreCompleto Nombre completo del usuario
+     * @param ipAddress Dirección IP desde donde se intentó el login
+     */
+    public void sendLoginAttemptAlert(String email, String nombreCompleto, String ipAddress) {
+        try {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            String fechaIntento = LocalDateTime.now().format(formatter);
+            
+            Context context = new Context();
+            context.setVariable("nombreCompleto", nombreCompleto != null && !nombreCompleto.trim().isEmpty() 
+                    ? nombreCompleto : "Usuario");
+            context.setVariable("ipAddress", ipAddress != null ? ipAddress : "No disponible");
+            context.setVariable("fechaIntento", fechaIntento);
+            context.setVariable("frontendUrl", frontendUrl);
+            
+            enviarCorreoHtml(
+                    email,
+                    "Alerta de Seguridad - Intentos de Login Sospechosos",
+                    "alerta-login",
+                    context
+            );
+        } catch (Exception e) {
+            throw new RuntimeException("Error al enviar alerta de login: " + e.getMessage(), e);
+        }
     }
-}
 }
