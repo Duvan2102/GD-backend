@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cuenta Activada - Helisa Document Manager</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .content {
+            padding: 30px 20px;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 30px;
+            background-color: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        .button:hover {
+            background-color: #5568d3;
+        }
+        .info-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Cuenta Activada</h1>
+            <p style="margin: 10px 0 0 0;">Helisa Document Manager</p>
+        </div>
+        <div class="content">
+            <p>Hola <strong th:text="${nombreCompleto}">Usuario</strong>,</p>
+            
+            <p>Su cuenta ha sido activada exitosamente en el sistema Helisa Document Manager.</p>
+            
+            <p>Para completar la configuración de su cuenta, debe establecer una contraseña.</p>
+            
+            <div style="text-align: center;">
+                <a th:href="${resetPasswordUrl}" class="button">Crear Contraseña</a>
+            </div>
+            
+            <div class="info-box">
+                <p><strong>Detalles de su cuenta:</strong></p>
+                <ul>
+                    <li><strong>Usuario:</strong> <span th:text="${usuario}">-</span></li>
+                    <li><strong>Enlace válido por:</strong> 24 horas</li>
+                </ul>
+            </div>
+            
+            <div class="warning">
+                <p><strong>⚠️ Importante:</strong></p>
+                <p>Si no solicitó esta activación, por favor contacte al administrador del sistema inmediatamente.</p>
+            </div>
+        </div>
+        <div class="footer">
+            <p>Este correo fue generado automáticamente por el sistema Helisa Document Manager.</p>
+            <p>No responda a este correo.</p>
+        </div>
+    </div>
+</body>
+</html>

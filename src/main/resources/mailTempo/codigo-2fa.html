@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Código de Verificación - Helisa Document Manager</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .content {
+            padding: 30px 20px;
+        }
+        .code-box {
+            background-color: #f8f9fa;
+            border: 3px dashed #667eea;
+            padding: 30px;
+            text-align: center;
+            margin: 30px 0;
+            border-radius: 8px;
+        }
+        .code {
+            font-size: 36px;
+            font-weight: bold;
+            color: #667eea;
+            letter-spacing: 8px;
+            font-family: 'Courier New', monospace;
+        }
+        .info-box {
+            background-color: #e7f3ff;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Código de Verificación</h1>
+            <p style="margin: 10px 0 0 0;">Helisa Document Manager</p>
+        </div>
+        <div class="content">
+            <p>Hola <strong th:text="${nombreCompleto}">Usuario</strong>,</p>
+            
+            <p>Su código de verificación de dos factores es:</p>
+            
+            <div class="code-box">
+                <div class="code" th:text="${codigo}">000000</div>
+            </div>
+            
+            <div class="info-box">
+                <p><strong>⏱️ Este código expirará en 10 minutos.</strong></p>
+                <p>Por favor, ingrese este código en el sistema para completar su autenticación.</p>
+            </div>
+            
+            <div class="warning">
+                <p><strong>⚠️ Importante:</strong></p>
+                <p>Si no solicitó este código, por favor ignore este correo y contacte al administrador del sistema.</p>
+            </div>
+        </div>
+        <div class="footer">
+            <p>Este correo fue generado automáticamente por el sistema Helisa Document Manager.</p>
+            <p>No responda a este correo.</p>
+        </div>
+    </div>
+</body>
+</html>

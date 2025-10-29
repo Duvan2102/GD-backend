@@ -113,6 +113,12 @@
 			<artifactId>spring-boot-starter-mail</artifactId>
 		</dependency>
 
+		<!-- Thymeleaf para plantillas de correo HTML -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-thymeleaf</artifactId>
+		</dependency>
+
 		<!-- Apache POI para generación de Excel -->
 		<dependency>
 			<groupId>org.apache.poi</groupId>
