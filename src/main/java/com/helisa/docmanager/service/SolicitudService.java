@@ -19,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -757,7 +758,7 @@ public class SolicitudService {
         }
     }
 
-    // Genera PDF simple con tabla (nombre/accion/fecha)
+    // Genera PDF con tabla formateada (nombre/accion/fecha/descripcion)
     private byte[] generarPdfLog(List<SolicitudHistorial> historial) throws Exception {
         org.apache.pdfbox.pdmodel.PDDocument doc = new org.apache.pdfbox.pdmodel.PDDocument();
         org.apache.pdfbox.pdmodel.PDPage page = new org.apache.pdfbox.pdmodel.PDPage();
@@ -765,35 +766,97 @@ public class SolicitudService {
 
         org.apache.pdfbox.pdmodel.PDPageContentStream cs = new org.apache.pdfbox.pdmodel.PDPageContentStream(doc, page);
         org.apache.pdfbox.pdmodel.font.PDType1Font font = org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA;
+        org.apache.pdfbox.pdmodel.font.PDType1Font fontBold = org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD;
 
         float margin = 50f;
-        float y = page.getMediaBox().getHeight() - margin;
+        float yStart = page.getMediaBox().getHeight() - margin;
         float leading = 16f;
+        float anchoPagina = page.getMediaBox().getWidth() - (margin * 2);
+        
+        // Anchos de columna (en puntos)
+        float anchoNombre = 120f;
+        float anchoAccion = 100f;
+        float anchoFecha = 150f;
+        float anchoDescripcion = anchoPagina - anchoNombre - anchoAccion - anchoFecha;
 
+        yStart -= leading * 2;
+        
         cs.beginText();
-        cs.setFont(font, 12);
-        cs.newLineAtOffset(margin, y);
+        cs.setFont(fontBold, 16);
+        cs.newLineAtOffset(margin, yStart);
         cs.showText("Log de Solicitud");
-        cs.newLineAtOffset(0, -leading * 2);
+        cs.endText();
+        yStart -= leading * 2;
 
-        // Encabezados
-        cs.showText("Nombre / Acción / Fecha / Descripción");
-        cs.newLineAtOffset(0, -leading);
+        // Encabezados de la tabla
+        cs.beginText();
+        cs.setFont(fontBold, 10);
+        cs.newLineAtOffset(margin, yStart);
+        cs.showText("Nombre");
+        cs.newLineAtOffset(anchoNombre, 0);
+        cs.showText("Acción");
+        cs.newLineAtOffset(anchoAccion, 0);
+        cs.showText("Fecha");
+        cs.newLineAtOffset(anchoFecha, 0);
+        cs.showText("Descripción");
+        cs.endText();
+        yStart -= leading;
 
-        java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        // Línea separadora debajo de encabezados
+        cs.setLineWidth(1f);
+        cs.moveTo(margin, yStart);
+        cs.lineTo(margin + anchoPagina, yStart);
+        cs.stroke();
+        yStart -= leading * 0.5f;
 
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+        // Datos de la tabla
+        cs.setFont(font, 9);
         for (SolicitudHistorial h : historial) {
             String nombre = h.getNombreUsuario() != null ? limpiarTexto(h.getNombreUsuario()) : "Sistema";
             String accion = h.getAccion() != null ? h.getAccion().name() : "";
             String comentario = h.getComentario() != null ? limpiarTexto(h.getComentario()) : "";
             String fecha = h.getFecha() != null ? h.getFecha().format(fmt) : "";
             
-            String linea = nombre + " / " + accion + " / " + fecha + " / " + comentario;
-            cs.showText(linea);
-            cs.newLineAtOffset(0, -leading);
+            // Salto de página si es necesario
+            if (yStart < margin) {
+                cs.endText();
+                cs.close();
+                page = new org.apache.pdfbox.pdmodel.PDPage();
+                doc.addPage(page);
+                cs = new org.apache.pdfbox.pdmodel.PDPageContentStream(doc, page);
+                yStart = page.getMediaBox().getHeight() - margin;
+                cs.setFont(font, 9);
+            }
+            
+            // Dibujar fila
+            cs.beginText();
+            cs.newLineAtOffset(margin, yStart);
+            
+            // Columna 1: Nombre
+            String nombreTruncado = truncarTexto(nombre, anchoNombre, font, 9);
+            cs.showText(nombreTruncado);
+            
+            // Columna 2: Acción
+            cs.newLineAtOffset(anchoNombre, 0);
+            String accionTruncada = truncarTexto(accion, anchoAccion, font, 9);
+            cs.showText(accionTruncada);
+            
+            // Columna 3: Fecha
+            cs.newLineAtOffset(anchoAccion, 0);
+            String fechaTruncada = truncarTexto(fecha, anchoFecha, font, 9);
+            cs.showText(fechaTruncada);
+            
+            // Columna 4: Descripción (permite truncar con "...")
+            cs.newLineAtOffset(anchoFecha, 0);
+            String descripcionTruncada = truncarTexto(comentario, anchoDescripcion, font, 9);
+            cs.showText(descripcionTruncada);
+            
+            cs.endText();
+            yStart -= leading;
         }
 
-        cs.endText();
         cs.close();
 
         java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
@@ -822,6 +885,42 @@ public class SolicitudService {
         texto = texto.replaceAll("\\s+", " ");
         
         return texto.trim();
+    }
+
+    /**
+     * Trunca el texto si excede el ancho máximo permitido en puntos
+     * Usa "..." al final si el texto fue truncado
+     */
+    private String truncarTexto(String texto, float anchoMaximo, org.apache.pdfbox.pdmodel.font.PDFont font, float fontSize) {
+        if (texto == null || texto.isEmpty()) {
+            return "";
+        }
+        
+        try {
+            float anchoTexto = font.getStringWidth(texto) / 1000 * fontSize;
+            
+            if (anchoTexto <= anchoMaximo) {
+                return texto;
+            }
+            
+            // Buscar el punto de corte usando búsqueda binaria
+            int longitud = texto.length();
+            String textoTruncado = texto;
+            
+            while (font.getStringWidth(textoTruncado + "...") / 1000 * fontSize > anchoMaximo && longitud > 0) {
+                longitud--;
+                textoTruncado = texto.substring(0, longitud);
+            }
+            
+            return textoTruncado + "...";
+        } catch (Exception e) {
+            // Si hay error calculando el ancho, simplemente truncar por caracteres
+            int maxChars = (int) (anchoMaximo / (fontSize * 0.6f)); // Aproximación
+            if (texto.length() > maxChars) {
+                return texto.substring(0, maxChars) + "...";
+            }
+            return texto;
+        }
     }
 
 
