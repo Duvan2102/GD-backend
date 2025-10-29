@@ -91,15 +91,45 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleIllegalState(
             IllegalStateException ex, HttpServletRequest request) {
 
+        String message = ex.getMessage();
+        String code = "CONFLICT";
+        HttpStatus status = HttpStatus.CONFLICT;
+        List<String> details = null;
+
+        // Proporcionar detalles adicionales según el contexto de la excepción
+        if (message != null) {
+            // Si el mensaje contiene información sobre estados de solicitud, agregar contexto
+            if (message.contains("ya fue aprobada") || 
+                message.contains("fue rechazada") || 
+                message.contains("fue cancelada") ||
+                message.contains("ya fue cancelada") ||
+                message.contains("ya fue rechazada")) {
+                code = "REQUEST_STATE_ERROR";
+                status = HttpStatus.CONFLICT;
+                details = List.of(
+                    "La solicitud ha cambiado de estado y no puede procesarse",
+                    "Verifique el estado actual de la solicitud antes de intentar procesarla"
+                );
+            } else if (message.contains("no autorizado") || message.contains("no tiene permiso")) {
+                code = "FORBIDDEN";
+                status = HttpStatus.FORBIDDEN;
+                details = List.of(
+                    "No tiene permisos para realizar esta acción",
+                    "Verifique que tiene los permisos necesarios para esta operación"
+                );
+            }
+        }
+
         ErrorResponse error = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .path(request.getRequestURI())
-                .code("CONFLICT")
-                .message(ex.getMessage())
+                .code(code)
+                .message(message)
+                .details(details)
                 .build();
 
-        log.warn("Estado ilegal en {}: {}", request.getRequestURI(), ex.getMessage());
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+        log.warn("Estado ilegal en {} [{}]: {}", request.getRequestURI(), code, message);
+        return ResponseEntity.status(status).body(error);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
