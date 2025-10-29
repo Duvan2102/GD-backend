@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nueva Solicitud de Aprobación</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background-color: #2c3e50;
+            color: #ffffff;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .content {
+            padding: 30px 20px;
+        }
+        .info-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .info-box.secuencial {
+            border-left-color: #f39c12;
+        }
+        .info-box.siguiente {
+            border-left-color: #27ae60;
+        }
+        .detail-row {
+            margin: 10px 0;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+        .label {
+            font-weight: bold;
+            color: #555;
+            display: inline-block;
+            width: 150px;
+        }
+        .value {
+            color: #333;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 30px;
+            background-color: #3498db;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .button:hover {
+            background-color: #2980b9;
+        }
+        .footer {
+            background-color: #ecf0f1;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+        .badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .badge.secuencial {
+            background-color: #f39c12;
+            color: #fff;
+        }
+        .badge.simultanea {
+            background-color: #3498db;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Nueva Solicitud de Aprobación</h1>
+        </div>
+        
+        <div class="content">
+            <p>Estimado/a,</p>
+            
+            <p>Se ha creado una nueva solicitud que requiere su aprobación:</p>
+            
+            <div class="info-box" th:classappend="${esOrdenSecuencial} ? 'secuencial' : ''" th:classappend="${esSiguienteAprobador} ? 'siguiente' : ''">
+                <div class="detail-row">
+                    <span class="label">ID Solicitud:</span>
+                    <span class="value" th:text="${solicitudId}">-</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Nombre:</span>
+                    <span class="value" th:text="${nombreSolicitud}">-</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Solicitante:</span>
+                    <span class="value" th:text="${nombreSolicitante}">-</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Tipo de Aprobación:</span>
+                    <span class="value">
+                        <span th:if="${esOrdenSecuencial}">
+                            Secuencial
+                            <span class="badge secuencial">Orden específico</span>
+                        </span>
+                        <span th:unless="${esOrdenSecuencial}">
+                            Simultánea
+                            <span class="badge simultanea">Todos a la vez</span>
+                        </span>
+                    </span>
+                </div>
+            </div>
+            
+            <div th:if="${esOrdenSecuencial && esSiguienteAprobador}">
+                <p><strong>Nota:</strong> El aprobador anterior ha completado su revisión. Es su turno de revisar y aprobar esta solicitud.</p>
+            </div>
+            
+            <div th:if="${esOrdenSecuencial && !esSiguienteAprobador}">
+                <p><strong>Nota:</strong> Esta solicitud requiere aprobación en orden secuencial. Usted es el primer aprobador en la lista.</p>
+            </div>
+            
+            <div th:unless="${esOrdenSecuencial}">
+                <p><strong>Nota:</strong> Esta solicitud requiere aprobación simultánea. Todos los aprobadores pueden revisarla al mismo tiempo.</p>
+            </div>
+            
+            <p>Por favor, acceda al sistema para revisar y procesar esta solicitud.</p>
+            
+            <div style="text-align: center;">
+                <a href="#" class="button" th:href="|${baseUrl}/solicitudes/${solicitudId}|">Ver Solicitud</a>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Este es un correo automático del sistema DocManager. Por favor, no responda a este mensaje.</p>
+            <p>© 2024 DocManager - Sistema de Gestión Documental</p>
+        </div>
+    </div>
+</body>
+</html>
