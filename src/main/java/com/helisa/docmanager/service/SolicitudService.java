@@ -9,6 +9,11 @@ import com.helisa.docmanager.model.*;
 import com.helisa.docmanager.repository.*;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
+
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -760,13 +765,13 @@ public class SolicitudService {
 
     // Genera PDF con tabla formateada (nombre/accion/fecha/descripcion)
     private byte[] generarPdfLog(List<SolicitudHistorial> historial) throws Exception {
-        org.apache.pdfbox.pdmodel.PDDocument doc = new org.apache.pdfbox.pdmodel.PDDocument();
-        org.apache.pdfbox.pdmodel.PDPage page = new org.apache.pdfbox.pdmodel.PDPage();
+        PDDocument doc = new PDDocument();
+        PDPage page = new PDPage();
         doc.addPage(page);
 
-        org.apache.pdfbox.pdmodel.PDPageContentStream cs = new org.apache.pdfbox.pdmodel.PDPageContentStream(doc, page);
-        org.apache.pdfbox.pdmodel.font.PDType1Font font = org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA;
-        org.apache.pdfbox.pdmodel.font.PDType1Font fontBold = org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD;
+        PDPageContentStream cs = new PDPageContentStream(doc, page);
+        PDType1Font font = PDType1Font.HELVETICA;
+        PDType1Font fontBold = PDType1Font.HELVETICA_BOLD;
 
         float margin = 50f;
         float yStart = page.getMediaBox().getHeight() - margin;
@@ -776,7 +781,7 @@ public class SolicitudService {
         // Anchos de columna (en puntos)
         float anchoNombre = 100f;
         float anchoAccion = 100f;
-        float anchoFecha = 120f;
+        float anchoFecha = 95f;
         float anchoDescripcion = anchoPagina - anchoNombre - anchoAccion - anchoFecha;
 
         yStart -= leading * 2;
