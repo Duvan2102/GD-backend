@@ -91,6 +91,19 @@ public class AuthController {
 
             loginAttemptService.recordSuccessfulLogin(request.getUsuario(), ipAddress);
 
+            // Verificar si el usuario usa Google Auth y no tiene configuración
+            boolean usaGoogleAuth = usuario.getTokenQr() != null && usuario.getTokenQr();
+            boolean noTieneConfiguracionGoogle = !twoFactorAuthService.hasAnyGoogleAuthToken(usuario.getUsuario());
+            
+            // Si usa Google Auth y no tiene configuración, generar el setup y crear token pendiente
+            if (usaGoogleAuth && noTieneConfiguracionGoogle) {
+                TwoFactorAuthService.TwoFactorSetupResult result = twoFactorAuthService.setupGoogleAuth(usuario);
+                twoFactorAuthService.createPendingGoogleAuthToken(usuario);
+                return ResponseEntity.status(HttpStatus.ACCEPTED)
+                        .body(new TwoFactorSetupResponse(result.getQrCodeUrl(), result.getSecret(), 
+                                "Debes configurar Google Authenticator escaneando el código QR primero"));
+            }
+
             String tempToken = jwtService.generateTempToken(userDetails.getUsername());
             return ResponseEntity.status(HttpStatus.ACCEPTED)
                     .body(new TwoFactorRequiredResponse("Se requiere código de verificación", 
@@ -457,6 +470,7 @@ public class AuthController {
             usuarioRepository.save(usuario);
 
             TwoFactorAuthService.TwoFactorSetupResult result = twoFactorAuthService.setupGoogleAuth(usuario);
+            twoFactorAuthService.createPendingGoogleAuthToken(usuario);
             
             return ResponseEntity.ok(new TwoFactorSetupResponse(result.getQrCodeUrl(), result.getSecret(), 
                     "Escanea el código QR con Google Authenticator y luego confirma con un código"));
@@ -577,6 +591,7 @@ public class AuthController {
             } else {
                 // Si no tiene configurado, generar uno nuevo
                 TwoFactorAuthService.TwoFactorSetupResult result = twoFactorAuthService.setupGoogleAuth(usuario);
+                twoFactorAuthService.createPendingGoogleAuthToken(usuario);
                 return ResponseEntity.ok(new TwoFactorSetupResponse(result.getQrCodeUrl(), result.getSecret(), 
                         "Nuevo código QR para Google Authenticator"));
             }
@@ -606,6 +621,7 @@ public class AuthController {
             // Si el usuario tiene 2FA habilitado, generar nuevo setup para que pueda reconfigurar
             // 2FA es obligatorio - siempre generar nuevo setup para Google Auth
             twoFactorAuthService.setupGoogleAuth(usuario);
+            twoFactorAuthService.createPendingGoogleAuthToken(usuario);
             return ResponseEntity.ok(new MessageResponse("Google Authenticator desvinculado. Debes configurar Google Authenticator nuevamente en tu próximo inicio de sesión."));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -628,6 +644,7 @@ public class AuthController {
             // Si el usuario tenía 2FA habilitado, generar nuevo setup para Google Auth
             // 2FA es obligatorio - siempre generar nuevo setup para Google Auth
             twoFactorAuthService.setupGoogleAuth(user);
+            twoFactorAuthService.createPendingGoogleAuthToken(user);
             return ResponseEntity.ok(new MessageResponse("Estado de 2FA limpiado. El usuario debe configurar Google Authenticator en su próximo inicio de sesión."));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -677,6 +694,7 @@ public class AuthController {
                 
                 // Generar nueva configuración para Google Auth
                 twoFactorAuthService.setupGoogleAuth(usuario);
+                twoFactorAuthService.createPendingGoogleAuthToken(usuario);
                 
                 return ResponseEntity.ok(new MessageResponse("Método de autenticación cambiado a GOOGLE_AUTH. " +
                         "Debes configurar Google Authenticator en tu próximo inicio de sesión."));

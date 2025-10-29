@@ -152,7 +152,7 @@ public class TwoFactorAuthService {
     }
 
     /**
-     * Configura Google Authenticator para un usuario
+     * Configura Google Authenticator para un usuario (sin crear token pendiente)
      */
     public TwoFactorSetupResult setupGoogleAuth(Usuario usuario) {
         // Verificar si ya tiene un secreto configurado
@@ -176,6 +176,22 @@ public class TwoFactorAuthService {
             tokenRepository.save(token);
         }
         
+        String qrCodeUrl = generateQRCodeUrl(secret, usuario.getUsuario(), "Helisa");
+        return new TwoFactorSetupResult(qrCodeUrl, secret);
+    }
+
+    /**
+     * Crea un token pendiente para Google Authenticator
+     */
+    public void createPendingGoogleAuthToken(Usuario usuario) {
+        // Verificar si ya existe un token pendiente
+        LocalDateTime now = LocalDateTime.now();
+        var existingPending = tokenRepository.findValidTokenByUsuarioAndTipo(usuario, TIPO_GOOGLE_AUTH_PENDING, now);
+        
+        if (existingPending.isPresent()) {
+            return; // Ya existe un token pendiente
+        }
+        
         // Crear token pendiente para indicar que necesita confirmación
         Token pendingToken = new Token();
         pendingToken.setUsuario(usuario);
@@ -184,9 +200,6 @@ public class TwoFactorAuthService {
         pendingToken.setFechaExp(LocalDateTime.now().plusDays(7)); // Válido por 7 días
         
         tokenRepository.save(pendingToken);
-        
-        String qrCodeUrl = generateQRCodeUrl(secret, usuario.getUsuario(), "Helisa");
-        return new TwoFactorSetupResult(qrCodeUrl, secret);
     }
 
     /**
@@ -286,6 +299,16 @@ public class TwoFactorAuthService {
     public boolean hasGoogleAuthConfigured(String usuario) {
         LocalDateTime now = LocalDateTime.now();
         return tokenRepository.findValidTokenByUsuarioAndTipo(usuario, TIPO_GOOGLE_AUTH_SECRET, now).isPresent();
+    }
+
+    /**
+     * Verifica si un usuario tiene algún token de Google Auth (secreto o pendiente)
+     */
+    public boolean hasAnyGoogleAuthToken(String usuario) {
+        LocalDateTime now = LocalDateTime.now();
+        boolean hasSecret = tokenRepository.findValidTokenByUsuarioAndTipo(usuario, TIPO_GOOGLE_AUTH_SECRET, now).isPresent();
+        boolean hasPending = tokenRepository.findValidTokenByUsuarioAndTipo(usuario, TIPO_GOOGLE_AUTH_PENDING, now).isPresent();
+        return hasSecret || hasPending;
     }
 
     /**
