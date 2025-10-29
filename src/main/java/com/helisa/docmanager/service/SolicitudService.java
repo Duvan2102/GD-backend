@@ -783,9 +783,9 @@ public class SolicitudService {
         java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
         for (SolicitudHistorial h : historial) {
-            String nombre = h.getNombreUsuario() != null ? h.getNombreUsuario() : "Sistema";
+            String nombre = h.getNombreUsuario() != null ? limpiarTexto(h.getNombreUsuario()) : "Sistema";
             String accion = h.getAccion() != null ? h.getAccion().name() : "";
-            String comentario = h.getComentario() != null ? h.getComentario() : "";
+            String comentario = h.getComentario() != null ? limpiarTexto(h.getComentario()) : "";
             String fecha = h.getFecha() != null ? h.getFecha().format(fmt) : "";
             
             String linea = nombre + " / " + accion + " / " + fecha + " / " + comentario;
@@ -800,6 +800,28 @@ public class SolicitudService {
         doc.save(baos);
         doc.close();
         return baos.toByteArray();
+    }
+
+    /**
+     * Limpia el texto eliminando caracteres de control y caracteres especiales
+     * que no son compatibles con la codificación WinAnsiEncoding de PDFBox
+     */
+    private String limpiarTexto(String texto) {
+        if (texto == null) {
+            return "";
+        }
+        // Reemplazar saltos de línea y retornos de carro por espacios
+        texto = texto.replace('\r', ' ');
+        texto = texto.replace('\n', ' ');
+        texto = texto.replace('\t', ' ');
+        
+        // Eliminar cualquier otro carácter de control (caracteres fuera del rango ASCII 32-126)
+        texto = texto.replaceAll("[\\x00-\\x1F]", " ");
+        
+        // Normalizar espacios múltiples a uno solo
+        texto = texto.replaceAll("\\s+", " ");
+        
+        return texto.trim();
     }
 
 

@@ -68,7 +68,6 @@ public class AuthController {
         String ipAddress = getClientIpAddress(httpRequest);
         
         try {
-            // Verificar si el usuario está bloqueado
             if (loginAttemptService.isUserLocked(request.getUsuario())) {
                 long lockoutTime = loginAttemptService.getLockoutTimeRemaining(request.getUsuario());
                 return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
@@ -76,7 +75,6 @@ public class AuthController {
                                 "Usuario bloqueado. Intenta en " + lockoutTime + " minutos."));
             }
 
-            // Verificar límite de intentos por hora
             if (loginAttemptService.hasExceededHourlyLimit(request.getUsuario())) {
                 return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                         .body(new ErrorResponse("LIMITE_EXCEDIDO", 
