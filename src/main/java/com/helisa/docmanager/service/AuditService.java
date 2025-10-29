@@ -17,9 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -176,6 +174,14 @@ public class AuditService {
                 })
                 .collect(Collectors.toList());
         
+        // Obtener lista de usuarios destinatarios como string
+        String destinatariosLista = destinatarios.stream()
+                .map(dest -> {
+                    Usuario usuario = usuarioRepository.findById(dest.getUsuarioId()).orElse(null);
+                    return usuario != null ? usuario.getUsuario() : "usuario" + dest.getUsuarioId();
+                })
+                .collect(Collectors.joining(", "));
+        
         // Obtener historial
         List<HistorialResponse> historial = historialRepository
                 .findBySolicitudIdOrderByFechaAscWithUsuario(solicitud.getId().longValue())
@@ -210,6 +216,7 @@ public class AuditService {
                 .enviarRecordatorio(solicitud.getEnviarRecordatorio())
                 .destinatariosTotal(total.intValue())
                 .destinatariosAprobados(aprobados.intValue())
+                .destinatariosLista(destinatariosLista)
                 .pdfOriginalName(solicitud.getPdfOriginalName())
                 .pdfSizeBytes(solicitud.getPdfSizeBytes())
                 .destinatarios(destinatarios)
@@ -329,7 +336,7 @@ public class AuditService {
         String[] encabezados = {
             "ID Solicitud", "Nombre Solicitud", "Estado", "Tipología", "Departamento",
             "Solicitante", "Cargo Solicitante", "Fecha Registro", "Orden Firma",
-            "Prioridad", "Total Destinatarios", "Aprobados", "PDF Original",
+            "Prioridad", "Destinatarios", "Aprobados", "PDF Original",
             "Tamaño PDF (bytes)", "Tipo Registro", "Usuario", "Acción", "Comentario", "Fecha"
         };
         
@@ -354,7 +361,7 @@ public class AuditService {
         crearCeldaFecha(row, col++, audit.getFechaRegistro(), dateStyle);
         crearCelda(row, col++, audit.getOrdenFirma() ? "Sí" : "No", dataStyle);
         crearCelda(row, col++, audit.getPrioridad() ? "Sí" : "No", dataStyle);
-        crearCelda(row, col++, audit.getDestinatariosTotal().toString(), dataStyle);
+        crearCelda(row, col++, audit.getDestinatariosLista() != null ? audit.getDestinatariosLista() : "", dataStyle);
         crearCelda(row, col++, audit.getDestinatariosAprobados().toString(), dataStyle);
         crearCelda(row, col++, audit.getPdfOriginalName(), dataStyle);
         crearCelda(row, col++, audit.getPdfSizeBytes().toString(), dataStyle);

@@ -28,6 +28,7 @@ public class AuditSolicitudResponse {
     private Integer enviarRecordatorio;
     private Integer destinatariosTotal;
     private Integer destinatariosAprobados;
+    private String destinatariosLista;
     private String pdfOriginalName;
     private Long pdfSizeBytes;
     private List<DestinatarioResponse> destinatarios;
