@@ -120,7 +120,25 @@ public class SolicitudService {
     }
 
     public void aprobar(Integer solicitudId, DecisionRequest request) {
-        Solicitud solicitud = obtenerSolicitudPendiente(solicitudId);
+        Solicitud solicitud = solicitudRepository.findById(solicitudId)
+                .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
+
+        // Verificar el estado de la solicitud y proporcionar mensajes descriptivos
+        if (solicitud.estaAprobado()) {
+            throw new IllegalStateException("La solicitud ya fue aprobada anteriormente");
+        }
+        
+        if (solicitud.estaRechazado()) {
+            throw new IllegalStateException("La solicitud fue rechazada y no puede ser aprobada");
+        }
+        
+        if (solicitud.estaCancelado()) {
+            throw new IllegalStateException("La solicitud fue cancelada y no puede ser aprobada");
+        }
+        
+        if (!solicitud.estaPendiente()) {
+            throw new IllegalStateException("La solicitud no está en estado PENDIENTE");
+        }
 
         if (!flujoService.puedeAprobar(solicitudId, request.getUsuarioId(),
                 solicitud.getOrdenFirmaBoolean())) {
@@ -149,7 +167,25 @@ public class SolicitudService {
     }
 
     public void rechazar(Integer solicitudId, DecisionRequest request) {
-        Solicitud solicitud = obtenerSolicitudPendiente(solicitudId);
+        Solicitud solicitud = solicitudRepository.findById(solicitudId)
+                .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
+
+        // Verificar el estado de la solicitud y proporcionar mensajes descriptivos
+        if (solicitud.estaAprobado()) {
+            throw new IllegalStateException("La solicitud ya fue aprobada y no puede ser rechazada");
+        }
+        
+        if (solicitud.estaRechazado()) {
+            throw new IllegalStateException("La solicitud ya fue rechazada anteriormente");
+        }
+        
+        if (solicitud.estaCancelado()) {
+            throw new IllegalStateException("La solicitud fue cancelada y no puede ser rechazada");
+        }
+        
+        if (!solicitud.estaPendiente()) {
+            throw new IllegalStateException("La solicitud no está en estado PENDIENTE");
+        }
 
         SolicitudDestinatario destinatario = destinatarioRepository
                 .findBySolicitudIdAndUsuarioId(solicitudId, request.getUsuarioId())
@@ -174,7 +210,25 @@ public class SolicitudService {
     }
 
     public void cancelar(Integer solicitudId, DecisionRequest request) {
-        Solicitud solicitud = obtenerSolicitudPendiente(solicitudId);
+        Solicitud solicitud = solicitudRepository.findById(solicitudId)
+                .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
+
+        // Verificar el estado de la solicitud y proporcionar mensajes descriptivos
+        if (solicitud.estaAprobado()) {
+            throw new IllegalStateException("La solicitud ya fue aprobada y no puede ser cancelada");
+        }
+        
+        if (solicitud.estaRechazado()) {
+            throw new IllegalStateException("La solicitud fue rechazada y no puede ser cancelada");
+        }
+        
+        if (solicitud.estaCancelado()) {
+            throw new IllegalStateException("La solicitud ya fue cancelada anteriormente");
+        }
+        
+        if (!solicitud.estaPendiente()) {
+            throw new IllegalStateException("La solicitud no está en estado PENDIENTE");
+        }
 
         // Verificar autorización
         boolean esCreador = solicitud.getIdSolicitante().equals(request.getUsuarioId());
@@ -204,17 +258,6 @@ public class SolicitudService {
     }
 
     // ================ MÉTODOS AUXILIARES ================
-
-    private Solicitud obtenerSolicitudPendiente(Integer solicitudId) {
-        Solicitud solicitud = solicitudRepository.findById(solicitudId)
-                .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
-
-        if (!solicitud.estaPendiente()) {
-            throw new IllegalStateException("La solicitud no está en estado PENDIENTE");
-        }
-
-        return solicitud;
-    }
 
     @Transactional(readOnly = true)
     public Page<SolicitudResumenResponse> listarPorCreador(Integer creadorId, String estado, Pageable pageable) {
