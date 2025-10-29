@@ -774,9 +774,9 @@ public class SolicitudService {
         float anchoPagina = page.getMediaBox().getWidth() - (margin * 2);
         
         // Anchos de columna (en puntos)
-        float anchoNombre = 120f;
+        float anchoNombre = 100f;
         float anchoAccion = 100f;
-        float anchoFecha = 150f;
+        float anchoFecha = 120f;
         float anchoDescripcion = anchoPagina - anchoNombre - anchoAccion - anchoFecha;
 
         yStart -= leading * 2;
