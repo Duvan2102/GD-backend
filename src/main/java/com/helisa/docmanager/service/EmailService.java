@@ -31,13 +31,6 @@ public class EmailService {
     @Value("${spring.mail.username:noreply@helisa.com}")
     private String fromEmail;
 
-    /**
-     * Método auxiliar para enviar correos HTML usando plantillas Thymeleaf
-     * @param to Email del destinatario
-     * @param subject Asunto del correo
-     * @param templateName Nombre de la plantilla (sin extensión .html)
-     * @param context Contexto con las variables para la plantilla
-     */
     private void enviarCorreoHtml(String to, String subject, String templateName, Context context) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
@@ -47,7 +40,7 @@ public class EmailService {
             helper.setTo(to);
             helper.setSubject(subject);
             
-            String htmlContent = templateEngine.process("mailTempo/" + templateName, context);
+            String htmlContent = templateEngine.process("mailTemp/" + templateName, context);
             helper.setText(htmlContent, true);
             
             mailSender.send(message);
@@ -56,12 +49,6 @@ public class EmailService {
         }
     }
 
-    /**
-     * Envía correo de activación con token para que el usuario cree su contraseña
-     * Usado para usuarios PENDIENTES que están siendo activados por primera vez
-     * @param usuario Usuario que fue activado
-     * @param token Token de restablecimiento de contraseña
-     */
     public void enviarCorreoActivacionConToken(Usuario usuario, String token) {
         try {
             String nombreCompleto = Stream.of(usuario.getNombres(), usuario.getApellidos())
@@ -88,10 +75,6 @@ public class EmailService {
         }
     }
 
-    /**
-     * Envía correo de reactivación para usuarios INACTIVOS
-     * @param usuario Usuario que fue reactivado
-     */
     public void enviarCorreoReactivacion(Usuario usuario) {
         try {
             String nombreCompleto = Stream.of(usuario.getNombres(), usuario.getApellidos())
@@ -116,22 +99,14 @@ public class EmailService {
         }
     }
 
-    /**
-     * @deprecated Usar enviarCorreoActivacionConToken en su lugar
-     * Envía correo de activación con URL para restablecer contraseña
-     * @param usuario Usuario que fue activado
-     */
+ 
     @Deprecated
     public void enviarCorreoActivacion(Usuario usuario) {
         // Mantener compatibilidad pero redirigir al método nuevo
         enviarCorreoActivacionConToken(usuario, generarTokenRestablecimiento(usuario));
     }
 
-    /**
-     * Envía correo de restablecimiento de contraseña
-     * @param usuario Usuario que solicita restablecimiento
-     * @param token Token de restablecimiento
-     */
+
     public void enviarCorreoRestablecimiento(Usuario usuario, String token) {
         try {
             String nombreCompleto = Stream.of(usuario.getNombres(), usuario.getApellidos())
@@ -157,12 +132,6 @@ public class EmailService {
         }
     }
 
-    /**
-     * Envía código de verificación de dos factores por email
-     * @param email Email del usuario
-     * @param codigo Código de verificación
-     * @param nombreCompleto Nombre completo del usuario
-     */
     public void sendTwoFactorCode(String email, String codigo, String nombreCompleto) {
         try {
             Context context = new Context();
@@ -181,11 +150,7 @@ public class EmailService {
         }
     }
 
-    /**
-     * Envía correo simple de recordatorio de solicitud
-     * @param email Email del destinatario
-     * @param numeroSolicitud Número/ID de la solicitud
-     */
+
     public void enviarRecordatorioSolicitud(String email, Integer numeroSolicitud) {
         try {
             Context context = new Context();
@@ -203,15 +168,7 @@ public class EmailService {
         }
     }
 
-    /**
-     * Envía notificación de nueva solicitud creada a los aprobadores
-     * @param email Email del destinatario
-     * @param numeroSolicitud Número/ID de la solicitud
-     * @param nombreSolicitud Nombre de la solicitud
-     * @param nombreSolicitante Nombre del solicitante
-     * @param esOrdenSecuencial Si la solicitud requiere orden secuencial
-     * @param esSiguienteAprobador Si este usuario es el siguiente en aprobar (solo aplica si es orden secuencial)
-     */
+ 
     public void enviarNotificacionNuevaSolicitud(String email, Integer numeroSolicitud, 
                                                 String nombreSolicitud, String nombreSolicitante,
                                                 boolean esOrdenSecuencial, boolean esSiguienteAprobador) {
@@ -253,24 +210,14 @@ public class EmailService {
         }
     }
 
-    /**
-     * Genera un token simple para restablecimiento de contraseña
-     * En un entorno de producción, esto debería ser más seguro
-     * @param usuario Usuario para el cual generar el token
-     * @return Token generado
-     */
+
     private String generarTokenRestablecimiento(Usuario usuario) {
         // Generar un token simple basado en el ID del usuario y timestamp
         long timestamp = System.currentTimeMillis();
         return String.format("%d_%d", usuario.getIdUsuario(), timestamp);
     }
 
-    /**
-     * Envía alerta de intentos de login sospechosos
-     * @param email Email del usuario
-     * @param nombreCompleto Nombre completo del usuario
-     * @param ipAddress Dirección IP desde donde se intentó el login
-     */
+
     public void sendLoginAttemptAlert(String email, String nombreCompleto, String ipAddress) {
         try {
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
