@@ -13,7 +13,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-import com.helisa.docmanager.repository.TokenRepository;
+import com.helisa.docmanager.repository.RevokedTokenRepository;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -30,7 +30,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private UserDetailsService userDetailsService;
 
     @Autowired
-    private TokenRepository tokenRepository;
+    private RevokedTokenRepository revokedTokenRepository;
 
     // Lista de endpoints públicos que no requieren autenticación
     private static final List<String> PUBLIC_ENDPOINTS = Arrays.asList(
@@ -39,6 +39,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         "/api/auth/validate-2fa",
         "/api/auth/send-email-code",
         "/api/auth/2fa-status/",
+        "/api/auth/logout",
         "/api/password-reset/request",
         "/api/password-reset/confirm",
         "/api/password-reset/validate-token"
@@ -96,14 +97,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+
             // Verificar si el token está revocado
             try {
                 String jti = jwtService.extractJti(jwt);
-                if (jti != null && tokenRepository.existsRevokedJwtByJti(jti)) {
+                if (revokedTokenRepository.existsByJti(jti)) {
                     log.warn("Intento de uso de token revocado - JTI: {}", jti);
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     response.setContentType("application/json");
-                    response.getWriter().write("{\"error\":\"Token revocado\",\"message\":\"Su sesión ha sido revocada. Por favor, inicie sesión nuevamente.\"}");
+                    response.getWriter().write("{\"error\":\"Token revocado\",\"message\":\"Su sesión ha sido cerrada. Por favor, inicie sesión nuevamente.\"}");
                     return;
                 }
             } catch (Exception e) {
@@ -157,6 +159,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     return true;
                 }
                 if ("/api/auth/2fa-status/".equals(publicEndpoint) && "GET".equals(requestMethod)) {
+                    return true;
+                }
+                if ("/api/auth/logout".equals(publicEndpoint) && "POST".equals(requestMethod)) {
                     return true;
                 }
                 if ("/api/password-reset/request".equals(publicEndpoint) && "POST".equals(requestMethod)) {

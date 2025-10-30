@@ -1,6 +1,8 @@
 package com.helisa.docmanager.service;
 
 import com.helisa.docmanager.repository.TokenRepository;
+import com.helisa.docmanager.repository.RevokedTokenRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -8,11 +10,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
+@Slf4j
 @Service
 public class TokenCleanupService {
 
     @Autowired
     private TokenRepository tokenRepository;
+
+    @Autowired
+    private RevokedTokenRepository revokedTokenRepository;
 
     /**
      * Limpia tokens expirados cada 10 minutos
@@ -24,10 +30,29 @@ public class TokenCleanupService {
             LocalDateTime now = LocalDateTime.now();
             int deletedCount = tokenRepository.deleteExpiredTokens(now);
             if (deletedCount > 0) {
-                System.out.println("TokenCleanupService - Eliminados " + deletedCount + " tokens expirados");
+                log.info("TokenCleanupService - Eliminados {} tokens expirados", deletedCount);
             }
         } catch (Exception e) {
-            System.out.println("TokenCleanupService - Error al limpiar tokens expirados: " + e.getMessage());
+            log.error("TokenCleanupService - Error al limpiar tokens expirados: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Limpia tokens revocados expirados cada hora
+     * Elimina los tokens revocados que ya expiraron hace más de 1 día
+     */
+    @Scheduled(fixedRate = 3600000) // 1 hora
+    @Transactional
+    public void cleanupRevokedTokens() {
+        try {
+            // Eliminar tokens revocados que expiraron hace más de 1 día
+            LocalDateTime cutoffDate = LocalDateTime.now().minusDays(1);
+            long deletedCount = revokedTokenRepository.deleteByExpiresAtBefore(cutoffDate);
+            if (deletedCount > 0) {
+                log.info("TokenCleanupService - Eliminados {} tokens revocados expirados", deletedCount);
+            }
+        } catch (Exception e) {
+            log.error("TokenCleanupService - Error al limpiar tokens revocados: {}", e.getMessage());
         }
     }
 }

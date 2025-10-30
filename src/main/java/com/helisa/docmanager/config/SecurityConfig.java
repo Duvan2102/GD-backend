@@ -49,6 +49,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/auth/2fa-status/*").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/password/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/password/*").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/logout").permitAll()
                         
                         // Endpoints públicos de recuperación de contraseña
                         .requestMatchers(HttpMethod.POST, "/api/password-reset/request").permitAll()
