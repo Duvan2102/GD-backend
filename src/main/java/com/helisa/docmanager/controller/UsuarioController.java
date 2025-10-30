@@ -3,6 +3,7 @@ package com.helisa.docmanager.controller;
 import com.helisa.docmanager.model.Usuario;
 import com.helisa.docmanager.model.CambiarPasswordRequest;
 import com.helisa.docmanager.service.UsuarioService;
+import com.helisa.docmanager.service.UsuarioActivationService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -11,6 +12,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,6 +26,9 @@ public class UsuarioController {
 
     @Autowired
     private UsuarioService usuarioService;
+
+    @Autowired
+    private UsuarioActivationService usuarioActivationService;
 
     @PostMapping
     public ResponseEntity<?> crearUsuario(@Valid @RequestBody Usuario usuario) {
@@ -162,29 +168,20 @@ public class UsuarioController {
     @PutMapping("/{id}/activar")
     public ResponseEntity<?> activarUsuario(@PathVariable Integer id) {
         try {
-            System.out.println("UsuarioController - Intentando activar usuario con ID: " + id);
             
-            // Verificar autenticación
-            org.springframework.security.core.Authentication auth = 
-                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             
             if (auth == null || !auth.isAuthenticated()) {
-                System.out.println("UsuarioController - Usuario no autenticado");
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                         .body(new ErrorResponse("No autorizado", "Usuario no autenticado"));
             }
             
-            System.out.println("UsuarioController - Usuario autenticado: " + auth.getName());
-            
-            Usuario usuario = usuarioService.activarUsuario(id);
-            System.out.println("UsuarioController - Usuario activado exitosamente: " + usuario.getUsuario());
+            Usuario usuario = usuarioActivationService.activarUsuario(id);
             return ResponseEntity.ok(usuario);
         } catch (RuntimeException e) {
-            System.out.println("UsuarioController - Error al activar usuario: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(new ErrorResponse("Error al activar usuario", e.getMessage()));
         } catch (Exception e) {
-            System.out.println("UsuarioController - Error interno: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new ErrorResponse("Error interno del servidor", e.getMessage()));
         }
