@@ -4,13 +4,11 @@ import com.helisa.docmanager.security.JwtService;
 import com.helisa.docmanager.model.Cargo;
 import com.helisa.docmanager.model.Estado;
 import com.helisa.docmanager.model.RevokedToken;
-import com.helisa.docmanager.model.Rol;
 import com.helisa.docmanager.model.Usuario;
 import com.helisa.docmanager.model.Tipologia;
 import com.helisa.docmanager.repository.CargoRepository;
 import com.helisa.docmanager.repository.EstadoRepository;
 import com.helisa.docmanager.repository.RevokedTokenRepository;
-import com.helisa.docmanager.repository.RolRepository;
 import com.helisa.docmanager.repository.UsuarioRepository;
 import com.helisa.docmanager.repository.TipologiaRepository;
 import com.helisa.docmanager.service.TwoFactorAuthService;
@@ -91,11 +89,9 @@ public class AuthController {
 
             loginAttemptService.recordSuccessfulLogin(request.getUsuario(), ipAddress);
 
-            // Verificar si el usuario usa Google Auth y no tiene configuración
             boolean usaGoogleAuth = usuario.getTokenQr() != null && usuario.getTokenQr();
             boolean noTieneConfiguracionGoogle = !twoFactorAuthService.hasAnyGoogleAuthToken(usuario.getUsuario());
             
-            // Si usa Google Auth y no tiene configuración, generar el setup y crear token pendiente
             if (usaGoogleAuth && noTieneConfiguracionGoogle) {
                 TwoFactorAuthService.TwoFactorSetupResult result = twoFactorAuthService.setupGoogleAuth(usuario);
                 twoFactorAuthService.createPendingGoogleAuthToken(usuario);
@@ -165,11 +161,13 @@ public class AuthController {
                     .orElseThrow(() -> new RuntimeException("Cargo con ID " + request.getCargoId() + " no encontrado"));
             nuevoUsuario.setCargo(cargoSeleccionado);
 
-            // Establecer rol por defecto con ID 2
-            RolRepository rolRepository = usuarioService.getRolRepository();
-            Rol rolDefault = rolRepository.findById(2)
-                    .orElseThrow(() -> new RuntimeException("Rol con ID 2 no encontrado en el sistema"));
-            nuevoUsuario.setRol(rolDefault);
+            // Establecer vistas disponibles por defecto (si no se proporcionan en el request)
+            if (request.getRol() != null && !request.getRol().isEmpty()) {
+                nuevoUsuario.setRol(request.getRol());
+            } else {
+                // Vistas por defecto (puedes ajustar según tus necesidades)
+                nuevoUsuario.setRol(java.util.Arrays.asList(1, 2));
+            }
 
             // Establecer estado PENDIENTE
             EstadoRepository estadoRepository = usuarioService.getEstadoRepository();
@@ -271,7 +269,7 @@ public class AuthController {
             private final String telefono2;
             private final String direccion;
             private final CargoData cargo;
-            private final String rol;
+            private final java.util.List<Integer> rol;
             private final String estado;
             private final java.util.List<TipologiaData> tipologias;
             
@@ -287,7 +285,7 @@ public class AuthController {
                 this.telefono2 = usuario.getTelefono2();
                 this.direccion = usuario.getDireccion();
                 this.cargo = usuario.getCargo() != null ? new CargoData(usuario.getCargo()) : null;
-                this.rol = usuario.getRol() != null ? usuario.getRol().getDescripcion() : null;
+                this.rol = usuario.getRol() != null ? usuario.getRol() : java.util.Collections.emptyList();
                 this.estado = usuario.getEstado() != null ? usuario.getEstado().getDescripcion() : null;
                 
                 if (usuario.getCargo() != null) {
@@ -780,6 +778,7 @@ public class AuthController {
         private String telefono2;
         private String direccion;
         private Integer cargoId;
+        private java.util.List<Integer> rol;
     }
 
     @Data

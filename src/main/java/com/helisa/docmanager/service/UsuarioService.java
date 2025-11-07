@@ -3,11 +3,9 @@ package com.helisa.docmanager.service;
 import com.helisa.docmanager.model.Cargo;
 import com.helisa.docmanager.model.Usuario;
 import com.helisa.docmanager.model.Estado;
-import com.helisa.docmanager.model.Rol;
 import com.helisa.docmanager.repository.CargoRepository;
 import com.helisa.docmanager.repository.UsuarioRepository;
 import com.helisa.docmanager.repository.EstadoRepository;
-import com.helisa.docmanager.repository.RolRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -32,9 +30,6 @@ public class UsuarioService {
 
     @Autowired
     private EstadoRepository estadoRepository;
-
-    @Autowired
-    private RolRepository rolRepository;
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
@@ -63,6 +58,11 @@ public class UsuarioService {
             }
         } else {
             throw new RuntimeException("Debe especificar un cargo válido");
+        }
+
+        // Validar que se proporcionen vistas disponibles
+        if (usuario.getRol() == null || usuario.getRol().isEmpty()) {
+            throw new RuntimeException("Debe especificar al menos una vista disponible para el usuario");
         }
 
         if (usuario.getPassword() == null || usuario.getPassword().trim().isEmpty()) {
@@ -178,13 +178,9 @@ public class UsuarioService {
             }
         }
 
-        if (usuarioActualizado.getRol() != null && usuarioActualizado.getRol().getIdRol() != null) {
-            Optional<Rol> rolOpt = rolRepository.findById(usuarioActualizado.getRol().getIdRol());
-            if (rolOpt.isPresent()) {
-                usuario.setRol(rolOpt.get());
-            } else {
-                throw new RuntimeException("El rol especificado no existe: " + usuarioActualizado.getRol().getIdRol());
-            }
+        // Actualizar vistas disponibles si se proporcionan
+        if (usuarioActualizado.getRol() != null && !usuarioActualizado.getRol().isEmpty()) {
+            usuario.setRol(usuarioActualizado.getRol());
         }
 
         usuario.setCorreoEmpresarial(usuarioActualizado.getCorreoEmpresarial());
@@ -262,9 +258,5 @@ public class UsuarioService {
 
     public EstadoRepository getEstadoRepository() {
         return estadoRepository;
-    }
-
-    public RolRepository getRolRepository() {
-        return rolRepository;
     }
 }

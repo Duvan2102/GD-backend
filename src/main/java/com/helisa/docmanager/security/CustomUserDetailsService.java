@@ -40,9 +40,10 @@ public class CustomUserDetailsService implements UserDetailsService {
     }
 
     private Collection<? extends GrantedAuthority> mapAuthorities(Usuario usuario) {
-        if (usuario.getRol() != null && usuario.getRol().getDescripcion() != null) {
-            String roleName = usuario.getRol().getDescripcion().toUpperCase().replaceAll("\\s+", "_");
-            return List.of(new SimpleGrantedAuthority("ROLE_" + roleName));
+        if (usuario.getRol() != null && !usuario.getRol().isEmpty()) {
+            return usuario.getRol().stream()
+                    .map(vistaId -> new SimpleGrantedAuthority("VISTA_" + vistaId))
+                    .collect(java.util.stream.Collectors.toList());
         }
         return List.of();
     }

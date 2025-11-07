@@ -40,26 +40,11 @@ public class Solicitud {
     @JoinColumn(name = "id_tipologia", insertable = false, updatable = false)
     private Tipologia tipologia;
 
-    @Column(name = "detalles_adicionales", columnDefinition = "TEXT")
-    private String detallesAdicionales;
-
     @Column(name = "prioridad")
     private Boolean prioridad;
 
     @Column(name = "enviar_recordatorio")
     private Integer enviarRecordatorio;
-
-    @Column(name = "documento_principal")
-    private String documentoPrincipal;
-
-    @Column(name = "documentos_adicionales", columnDefinition = "TEXT")
-    private String documentosAdicionales;
-
-    @Column(name = "destinatarios", columnDefinition = "TEXT")
-    private String destinatarios;
-
-    @Column(name = "orden_firma")
-    private String ordenFirma;
 
     @Column(name = "fecha_registro")
     private LocalDateTime fechaRegistro;
