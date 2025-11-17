@@ -242,6 +242,16 @@ public class UsuarioService {
     }
 
     @Transactional
+    public Usuario marcarUsuarioComoEliminado(Integer id) {
+        Usuario usuario = usuarioRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado con ID: " + id));
+        Estado eliminado = estadoRepository.findByDescripcion("ELIMINADO")
+                .orElseThrow(() -> new RuntimeException("Estado ELIMINADO no encontrado en BD"));
+        usuario.setEstado(eliminado);
+        return usuarioRepository.save(usuario);
+    }
+
+    @Transactional
     public Usuario cambiarPassword(Integer id, String nuevaPassword) {
         if (nuevaPassword == null || nuevaPassword.trim().isEmpty()) {
             throw new IllegalArgumentException("La nueva contraseña es obligatoria");

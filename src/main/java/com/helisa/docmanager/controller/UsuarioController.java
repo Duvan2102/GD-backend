@@ -131,19 +131,7 @@ public class UsuarioController {
         }
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<?> eliminarUsuario(@PathVariable Integer id) {
-        try {
-            usuarioService.eliminarUsuario(id);
-            return ResponseEntity.ok(new SuccessResponse("Usuario eliminado exitosamente"));
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(new ErrorResponse("Usuario no encontrado", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ErrorResponse("Error interno del servidor", e.getMessage()));
-        }
-    }
+    
 
     @GetMapping("/buscar")
     public ResponseEntity<List<Usuario>> buscarUsuarios(@RequestParam String termino) {
@@ -195,6 +183,20 @@ public class UsuarioController {
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(new ErrorResponse("Error al desactivar usuario", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("Error interno del servidor", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{id}/marcar-eliminado")
+    public ResponseEntity<?> marcarUsuarioComoEliminado(@PathVariable Integer id) {
+        try {
+            Usuario usuario = usuarioService.marcarUsuarioComoEliminado(id);
+            return ResponseEntity.ok(usuario);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ErrorResponse("Error al eliminar usuario", e.getMessage()));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new ErrorResponse("Error interno del servidor", e.getMessage()));
