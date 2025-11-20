@@ -27,4 +27,7 @@ public class Tipologia {
     @JsonIgnore
     @OneToMany(mappedBy = "tipologia")
     private List<Solicitud> solicitudes;
+
+    @Column(name = "requiere_proceso", nullable = false)
+    private Boolean requiereProceso = false;
 }
