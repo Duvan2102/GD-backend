@@ -252,4 +252,18 @@ public class SolicitudController {
                 solicitudService.listarFinalizadas(tipologiaId, estado, pageable);
         return ResponseEntity.ok(solicitudes);
     }
+
+    @GetMapping("/por-area")
+    public ResponseEntity<Page<SolicitudResumenResponse>> listarPorArea(
+            @RequestParam Integer usuarioId,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
+            @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
+
+        log.info("Listando solicitudes por área - Usuario: {}, CorrelationId: {}",
+                usuarioId, correlationId);
+
+        Page<SolicitudResumenResponse> solicitudes =
+                solicitudService.listarPorArea(usuarioId, pageable);
+        return ResponseEntity.ok(solicitudes);
+    }
 }

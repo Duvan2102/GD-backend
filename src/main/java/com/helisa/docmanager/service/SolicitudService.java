@@ -52,6 +52,8 @@ public class SolicitudService {
     @Autowired
     private UsuarioRepository usuarioRepository;
     @Autowired
+    private TipologiaRepository tipologiaRepository;
+    @Autowired
     private EmailService emailService;
 
     @Value("${storage.max-pdf-bytes:52428800}")
@@ -739,6 +741,35 @@ public class SolicitudService {
     public Page<SolicitudResumenResponse> listarFinalizadas(Integer tipologiaId, String estado, Pageable pageable) {
         Page<Solicitud> solicitudes = solicitudRepository
                 .findByIdTipologiaAndEstado_DescripcionIgnoreCase(tipologiaId, estado, pageable);
+        return solicitudes.map(this::mapearAResumen);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<SolicitudResumenResponse> listarPorArea(Integer usuarioId, Pageable pageable) {
+        // Obtener el usuario
+        Usuario usuario = usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado con id: " + usuarioId));
+        
+        // Verificar que el usuario tenga cargo
+        if (usuario.getCargo() == null || usuario.getCargo().getIdCargo() == null) {
+            throw new RuntimeException("El usuario no tiene un cargo asignado");
+        }
+        
+        // Obtener todas las tipologías asociadas al cargo del usuario
+        List<Tipologia> tipologias = tipologiaRepository.findByCargoIdCargo(usuario.getCargo().getIdCargo());
+        
+        // Si no hay tipologías, retornar página vacía
+        if (tipologias.isEmpty()) {
+            return Page.empty(pageable);
+        }
+        
+        // Extraer los IDs de las tipologías
+        List<Integer> tipologiaIds = tipologias.stream()
+                .map(Tipologia::getIdTipologia)
+                .collect(Collectors.toList());
+        
+        // Buscar solicitudes que tengan alguna de estas tipologías
+        Page<Solicitud> solicitudes = solicitudRepository.findByIdTipologiaIn(tipologiaIds, pageable);
         return solicitudes.map(this::mapearAResumen);
     }
 

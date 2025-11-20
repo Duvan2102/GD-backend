@@ -61,6 +61,10 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, Integer> {
     // Listar solicitudes pendientes que tengan periodicidad de recordatorio configurada (> 0)
     java.util.List<Solicitud> findByEstado_IdEstadoAndEnviarRecordatorioGreaterThan(Integer idEstado, Integer minValor);
     
+    // Búsqueda por múltiples tipologías
+    @Query("SELECT s FROM Solicitud s WHERE s.idTipologia IN :tipologiaIds")
+    Page<Solicitud> findByIdTipologiaIn(@Param("tipologiaIds") java.util.List<Integer> tipologiaIds, Pageable pageable);
+    
     // Métodos para auditoría
     Page<Solicitud> findByCreatedAtBetween(LocalDateTime fechaDesde, LocalDateTime fechaHasta, Pageable pageable);
     Page<Solicitud> findByCreatedAtAfter(LocalDateTime fechaDesde, Pageable pageable);
