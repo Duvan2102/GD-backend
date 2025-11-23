@@ -156,13 +156,22 @@ public class SolicitudService {
 
         if (flujoService.todosAprobaron(solicitudId)) {
             // Cambiar estado a APROBADO
-            Estado estadoAprobado = estadoRepository.getEstadoAprobado();
-            solicitud.setEstado(estadoAprobado);
-            solicitudRepository.save(solicitud);
+            boolean requiereProceso = solicitud.getTipologia().getRequiereProceso();
+            if (requiereProceso) {
+                // Crear proceso
+                Estado estadoAprobPendiente = estadoRepository.getEstadoaAprobPendiente();
+                solicitud.setEstado(estadoAprobPendiente);
+                solicitudRepository.save(solicitud);
 
-            crearHistorial(solicitud, request.getUsuarioId(),
-                    SolicitudHistorial.AccionEnum.APROBAR,
-                    "Solicitud aprobada por todos los destinatarios");
+            }else{
+                // Cambiar estado a APROBADO
+                Estado estadoAprobado = estadoRepository.getEstadoAprobado();
+                solicitud.setEstado(estadoAprobado);
+                solicitudRepository.save(solicitud);
+                crearHistorial(solicitud, request.getUsuarioId(),SolicitudHistorial.AccionEnum.APROBAR,
+                        "Solicitud aprobada por todos los destinatarios");
+            }
+
         } else {
             // Si aún quedan aprobadores y la solicitud tiene orden secuencial,
             // notificar al siguiente aprobador

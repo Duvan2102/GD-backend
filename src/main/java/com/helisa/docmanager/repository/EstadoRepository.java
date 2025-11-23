@@ -31,4 +31,9 @@ public interface EstadoRepository extends JpaRepository<Estado, Integer> {
         return findById(4).orElseThrow(() ->
                 new IllegalStateException("Estado CANCELADO no encontrado en BD"));
     }
+    
+    default Estado getEstadoaAprobPendiente() {
+        return findById(9).orElseThrow(() ->
+                new IllegalStateException("Estado APROBADO PENDIENTE no encontrado en BD"));
+    }
 }
