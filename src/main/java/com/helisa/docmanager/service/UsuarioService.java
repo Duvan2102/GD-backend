@@ -31,6 +31,12 @@ public class UsuarioService {
     @Autowired
     private EstadoRepository estadoRepository;
 
+    @Autowired
+    private EmailService emailService;
+
+    @Autowired
+    private PasswordResetService passwordResetService;
+
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @Transactional
@@ -77,8 +83,17 @@ public class UsuarioService {
         if (usuario.getTokenCorreo() == null) {
             usuario.setTokenCorreo(false);
         }
-
+        
+        if (usuario.getCorreoEmpresarial() != null && !usuario.getCorreoEmpresarial().trim().isEmpty()) {
+            try {
+                String token = passwordResetService.generarTokenParaActivacion(usuario.getIdUsuario());
+                emailService.enviarCorreoActivacionConToken(usuario, token);
+            } catch (Exception e) {
+                System.err.println("Error al enviar correo de activación: " + e.getMessage());
+            }
+        }
         return usuarioRepository.save(usuario);
+
     }
 
     private String generarContrasenaAleatoria(int longitud) {
