@@ -5,8 +5,15 @@ import com.helisa.docmanager.dto.response.SolicitudDetalleResponse;
 import com.helisa.docmanager.dto.response.SolicitudResumenResponse;
 import com.helisa.docmanager.model.CrearSolicitudRequest;
 import com.helisa.docmanager.model.DecisionRequest;
+import com.helisa.docmanager.model.Usuario;
+import com.helisa.docmanager.repository.UsuarioRepository;
 import com.helisa.docmanager.service.SolicitudService;
+import com.helisa.docmanager.service.TwoFactorAuthService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
@@ -32,6 +39,12 @@ public class SolicitudController {
 
     @Autowired
     private SolicitudService solicitudService;
+
+    @Autowired
+    private TwoFactorAuthService twoFactorAuthService;
+
+    @Autowired
+    private UsuarioRepository usuarioRepository;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<SolicitudDetalleResponse> crear(
@@ -106,6 +119,63 @@ public class SolicitudController {
                 id, request.getUsuarioId(), correlationId);
         solicitudService.cancelar(id, request);
         return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Valida el código 2FA del usuario para confirmar una acción en la solicitud.
+     * Este endpoint NO modifica la solicitud, solo valida el código 2FA.
+     */
+    @PostMapping("/{id}/validar-2fa")
+    public ResponseEntity<?> validar2FA(
+            @PathVariable Integer id,
+            @Valid @RequestBody Validar2FARequest request,
+            @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
+
+        log.info("Validando 2FA para solicitud - ID: {}, Usuario: {}, CorrelationId: {}",
+                id, request.getUsuarioId(), correlationId);
+
+        try {
+            // Validar que el usuario existe
+            Usuario usuario = usuarioRepository.findById(request.getUsuarioId())
+                    .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+            // Validar código 2FA según método configurado
+            if (!twoFactorAuthService.validateTwoFactorCode(usuario, request.getCodigo2FA())) {
+                String metodo = (usuario.getTokenQr() != null && usuario.getTokenQr()) 
+                        ? "Google Authenticator" 
+                        : "email";
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ErrorResponse("CODIGO_2FA_INVALIDO", 
+                                "Código de " + metodo + " incorrecto"));
+            }
+
+            log.info("2FA validado exitosamente - Solicitud: {}, Usuario: {}, CorrelationId: {}",
+                    id, request.getUsuarioId(), correlationId);
+
+            return ResponseEntity.ok(new Validar2FAResponse(
+                    true, 
+                    "Código 2FA validado correctamente. Puede proceder con la acción."));
+
+        } catch (RuntimeException e) {
+            if (e.getMessage().contains("excedido el límite")) {
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                        .body(new ErrorResponse("LIMITE_EXCEDIDO", e.getMessage()));
+            } else if (e.getMessage().contains("no encontrado")) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(new ErrorResponse("USUARIO_NO_ENCONTRADO", e.getMessage()));
+            } else if (e.getMessage().contains("no tiene método")) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(new ErrorResponse("2FA_NO_CONFIGURADO", e.getMessage()));
+            }
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("ERROR_VALIDACION", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Error al validar 2FA - Solicitud: {}, Usuario: {}", 
+                    id, request.getUsuarioId(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("ERROR_INTERNO", 
+                            "Error al validar código 2FA: " + e.getMessage()));
+        }
     }
 
     @GetMapping("/{id}/pdf")
@@ -265,5 +335,34 @@ public class SolicitudController {
         Page<SolicitudResumenResponse> solicitudes =
                 solicitudService.listarPorArea(usuarioId, pageable);
         return ResponseEntity.ok(solicitudes);
+    }
+
+    // ========== CLASES DE REQUEST/RESPONSE ==========
+
+    @Data
+    public static class Validar2FARequest {
+        @NotNull(message = "ID del usuario es obligatorio")
+        @Positive(message = "ID del usuario debe ser positivo")
+        private Integer usuarioId;
+
+        @NotBlank(message = "El código 2FA es obligatorio")
+        private String codigo2FA;
+    }
+
+    @Data
+    public static class Validar2FAResponse {
+        private final boolean valido;
+        private final String message;
+
+        public Validar2FAResponse(boolean valido, String message) {
+            this.valido = valido;
+            this.message = message;
+        }
+    }
+
+    @Data
+    public static class ErrorResponse {
+        private final String code;
+        private final String message;
     }
 }
