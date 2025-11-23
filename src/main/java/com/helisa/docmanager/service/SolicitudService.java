@@ -338,12 +338,22 @@ public class SolicitudService {
         Long aprobados = destinatarioRepository.countAprobadosBySolicitudId(solicitud.getId());
         Long total = destinatarioRepository.countTotalBySolicitudId(solicitud.getId());
 
+        // Obtener información de la tipología
+        String descripcionTipologia = null;
+        Boolean requiereProceso = null;
+        if (solicitud.getTipologia() != null) {
+            descripcionTipologia = solicitud.getTipologia().getDescripcion();
+            requiereProceso = solicitud.getTipologia().getRequiereProceso();
+        }
+
         return SolicitudDetalleResponse.builder()
                 .id(solicitud.getId())
 				.nombreSolicitud(solicitud.getNombreSolicitud())
                 .estado(solicitud.getEstado().getDescripcion())
 				.descripcionSolicitud(descripcionSolicitud) 
                 .idTipologia(solicitud.getIdTipologia())
+                .descripcionTipologia(descripcionTipologia)
+                .requiereProceso(requiereProceso)
                 .createdAt(solicitud.getCreatedAt())
                 .createdBy(solicitud.getIdSolicitante())
                 .ordenFirma(solicitud.getOrdenFirmaBoolean())

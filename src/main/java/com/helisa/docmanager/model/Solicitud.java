@@ -96,11 +96,13 @@ public class Solicitud {
     public static final Integer ESTADO_APROBADO_ID = 2;
     public static final Integer ESTADO_RECHAZADO_ID = 3;
     public static final Integer ESTADO_CANCELADO_ID = 4;
+    public static final Integer ESTADO_APROBADO_PROCESO_ID = 9;
 
     public static final String ESTADO_PENDIENTE = "PENDIENTE";
     public static final String ESTADO_APROBADO = "APROBADO";
     public static final String ESTADO_RECHAZADO = "RECHAZADO";
     public static final String ESTADO_CANCELADO = "CANCELADA";
+    public static final String ESTADO_APROBADO_PROCESO = "APROBADO PROCESO";
 
     // ===== MÉTODOS DE UTILIDAD =====
     @PrePersist

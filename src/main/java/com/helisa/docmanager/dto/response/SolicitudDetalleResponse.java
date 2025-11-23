@@ -18,6 +18,8 @@ public class SolicitudDetalleResponse {
     private Integer id;
     private String estado;
     private Integer idTipologia;
+    private String descripcionTipologia;
+    private Boolean requiereProceso;
     private LocalDateTime createdAt;
     private Integer createdBy;
 	private String nombreSolicitud;
