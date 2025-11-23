@@ -84,15 +84,20 @@ public class UsuarioService {
             usuario.setTokenCorreo(false);
         }
         
-        if (usuario.getCorreoEmpresarial() != null && !usuario.getCorreoEmpresarial().trim().isEmpty()) {
+        // Guardar el usuario primero para obtener el ID generado
+        Usuario usuarioGuardado = usuarioRepository.save(usuario);
+        
+        // Enviar correo de activación después de guardar el usuario
+        if (usuarioGuardado.getCorreoEmpresarial() != null && !usuarioGuardado.getCorreoEmpresarial().trim().isEmpty()) {
             try {
-                String token = passwordResetService.generarTokenParaActivacion(usuario.getIdUsuario());
-                emailService.enviarCorreoActivacionConToken(usuario, token);
+                String token = passwordResetService.generarTokenParaActivacion(usuarioGuardado.getIdUsuario());
+                emailService.enviarCorreoActivacionConToken(usuarioGuardado, token);
             } catch (Exception e) {
                 System.err.println("Error al enviar correo de activación: " + e.getMessage());
             }
         }
-        return usuarioRepository.save(usuario);
+        
+        return usuarioGuardado;
 
     }
 
