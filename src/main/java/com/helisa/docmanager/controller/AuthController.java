@@ -89,17 +89,20 @@ public class AuthController {
 
             loginAttemptService.recordSuccessfulLogin(request.getUsuario(), ipAddress);
 
+            // Si el usuario usa Google Auth pero no tiene configuración, generarla y marcarla como pendiente
             boolean usaGoogleAuth = usuario.getTokenQr() != null && usuario.getTokenQr();
             boolean noTieneConfiguracionGoogle = !twoFactorAuthService.hasAnyGoogleAuthToken(usuario.getUsuario());
             
             if (usaGoogleAuth && noTieneConfiguracionGoogle) {
-                TwoFactorAuthService.TwoFactorSetupResult result = twoFactorAuthService.setupGoogleAuth(usuario);
+                // Configurar Google Auth y crear token pendiente
+                // El frontend consultará /2fa-status/{usuario} para detectar googleAuthPending = true
+                // y luego usará /get-google-auth-qr para obtener el QR
+                twoFactorAuthService.setupGoogleAuth(usuario);
                 twoFactorAuthService.createPendingGoogleAuthToken(usuario);
-                return ResponseEntity.status(HttpStatus.ACCEPTED)
-                        .body(new TwoFactorSetupResponse(result.getQrCodeUrl(), result.getSecret(), 
-                                "Debes configurar Google Authenticator escaneando el código QR primero"));
             }
 
+            // Siempre devolver TwoFactorRequiredResponse para mantener consistencia con el flujo existente
+            // El frontend consultará /2fa-status/{usuario} para determinar el siguiente paso
             String tempToken = jwtService.generateTempToken(userDetails.getUsername());
             return ResponseEntity.status(HttpStatus.ACCEPTED)
                     .body(new TwoFactorRequiredResponse("Se requiere código de verificación", 
