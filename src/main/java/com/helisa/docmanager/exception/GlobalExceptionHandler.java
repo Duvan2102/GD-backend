@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -129,6 +130,65 @@ public class GlobalExceptionHandler {
                 .build();
 
         log.warn("Estado ilegal en {} [{}]: {}", request.getRequestURI(), code, message);
+        return ResponseEntity.status(status).body(error);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(
+            DataIntegrityViolationException ex, HttpServletRequest request) {
+
+        String message = "Error de integridad de datos";
+        String code = "DATA_INTEGRITY_ERROR";
+        HttpStatus status = HttpStatus.CONFLICT;
+        List<String> details = null;
+
+        String exceptionMessage = ex.getMessage();
+        if (exceptionMessage != null) {
+            // Detectar violación de restricción única
+            if (exceptionMessage.contains("duplicate key") || 
+                exceptionMessage.contains("uk_") ||
+                exceptionMessage.contains("unique constraint")) {
+                
+                code = "DUPLICATE_ENTRY";
+                status = HttpStatus.CONFLICT;
+                
+                // Extraer información específica del error
+                if (exceptionMessage.contains("solicitud_destinatario") || 
+                    exceptionMessage.contains("uk_solicitud_usuario") ||
+                    exceptionMessage.contains("uk_solicitud_usuario_pendiente")) {
+                    message = "Uno o más usuarios ya están asignados como procesadores pendientes en esta solicitud";
+                    details = List.of(
+                        "No se pueden agregar usuarios que ya tienen una asignación pendiente en esta solicitud",
+                        "Un usuario puede ser destinatario (ya aprobado) y procesador, pero no puede tener múltiples asignaciones pendientes",
+                        "Verifique la lista de procesadores pendientes antes de intentar agregar nuevos"
+                    );
+                } else {
+                    message = "Ya existe un registro con estos datos";
+                    details = List.of("El registro que intenta crear ya existe en el sistema");
+                }
+            } else if (exceptionMessage.contains("foreign key") || 
+                       exceptionMessage.contains("violates foreign key constraint")) {
+                code = "FOREIGN_KEY_VIOLATION";
+                message = "Referencia a registro inexistente";
+                details = List.of("Uno de los datos referenciados no existe en el sistema");
+            } else if (exceptionMessage.contains("not null") || 
+                       exceptionMessage.contains("null value")) {
+                code = "NULL_CONSTRAINT_VIOLATION";
+                message = "Campo obligatorio faltante";
+                details = List.of("Uno o más campos obligatorios no fueron proporcionados");
+            }
+        }
+
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .path(request.getRequestURI())
+                .code(code)
+                .message(message)
+                .details(details)
+                .build();
+
+        log.warn("Violación de integridad de datos en {} [{}]: {}", 
+                request.getRequestURI(), code, exceptionMessage);
         return ResponseEntity.status(status).body(error);
     }
 

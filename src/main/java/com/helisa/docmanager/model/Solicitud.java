@@ -135,6 +135,14 @@ public class Solicitud {
         return this.estado != null && this.estado.getIdEstado().equals(ESTADO_CANCELADO_ID);
     }
 
+    public boolean estaAprobadoProceso() {
+        return this.estado != null && this.estado.getIdEstado().equals(ESTADO_APROBADO_PROCESO_ID);
+    }
+
+    public boolean estaAprobadoOProceso() {
+        return estaAprobado() || estaAprobadoProceso();
+    }
+
     public boolean estaFinalizado() {
         return !estaPendiente();
     }

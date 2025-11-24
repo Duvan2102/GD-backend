@@ -9,6 +9,7 @@ import com.helisa.docmanager.model.*;
 import com.helisa.docmanager.repository.*;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -272,6 +273,106 @@ public class SolicitudService {
         historialRepository.save(historial);
 
         log.info("Solicitud {} cancelada por usuario {}", solicitudId, request.getUsuarioId());
+    }
+
+    public void agregarProcesadores(Integer solicitudId, ProcesadoresRequest request) {
+        Solicitud solicitud = solicitudRepository.findById(solicitudId)
+                .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
+
+        if (!solicitud.estaAprobadoOProceso()) {
+            throw new IllegalStateException(
+                    "Solo se pueden agregar procesadores a solicitudes que han sido aprobadas por todos los destinatarios. " +
+                    "Estado actual: " + (solicitud.getEstado() != null ? solicitud.getEstado().getDescripcion() : "DESCONOCIDO"));
+        }
+
+        List<Integer> procesadoresIds = Arrays.asList(request.getProcesadores());
+        List<Usuario> usuarios = usuarioRepository.findByIdUsuarioIn(procesadoresIds);
+        
+        if (usuarios.size() != procesadoresIds.size()) {
+            List<Integer> usuariosEncontrados = usuarios.stream()
+                    .map(Usuario::getIdUsuario)
+                    .collect(Collectors.toList());
+            List<Integer> usuariosNoEncontrados = procesadoresIds.stream()
+                    .filter(id -> !usuariosEncontrados.contains(id))
+                    .collect(Collectors.toList());
+            throw new IllegalArgumentException("Los siguientes usuarios no existen: " + usuariosNoEncontrados);
+        }
+
+        List<SolicitudDestinatario> destinatariosExistentes = destinatarioRepository
+                .findBySolicitudId(solicitudId);
+
+        Set<Integer> idsProcesadoresPendientes = destinatariosExistentes.stream()
+                .filter(d -> d.getDecision() == SolicitudDestinatario.DecisionEnum.PENDIENTE)
+                .map(SolicitudDestinatario::getUsuarioId)
+                .collect(Collectors.toSet());
+        
+        List<Integer> procesadoresDuplicados = procesadoresIds.stream()
+                .filter(idsProcesadoresPendientes::contains)
+                .collect(Collectors.toList());
+        
+        if (!procesadoresDuplicados.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Los siguientes usuarios ya están asignados como procesadores pendientes en esta solicitud: " + 
+                    procesadoresDuplicados);
+        }
+
+        int maxOrdenIndex = destinatariosExistentes.stream()
+                .mapToInt(SolicitudDestinatario::getOrdenIndex)
+                .max()
+                .orElse(-1);
+
+        List<SolicitudDestinatario> nuevosProcesadores = new ArrayList<>();
+        int siguienteOrden = maxOrdenIndex + 1;
+
+        for (Integer procesadorId : procesadoresIds) {
+            SolicitudDestinatario procesador = new SolicitudDestinatario();
+            procesador.setSolicitud(solicitud);
+            procesador.setUsuarioId(procesadorId);
+            procesador.setOrdenIndex(siguienteOrden++);
+            procesador.setDecision(SolicitudDestinatario.DecisionEnum.PENDIENTE);
+            nuevosProcesadores.add(procesador);
+        }
+
+        try {
+            destinatarioRepository.saveAll(nuevosProcesadores);
+        } catch (DataIntegrityViolationException e) {
+            log.warn("Violación de integridad al agregar procesadores a solicitud {}: {}", 
+                    solicitudId, e.getMessage());
+            
+            List<SolicitudDestinatario> destinatariosActualizados = destinatarioRepository
+                    .findBySolicitudId(solicitudId);
+            
+            Set<Integer> idsProcesadoresPendientesActualizados = destinatariosActualizados.stream()
+                    .filter(d -> d.getDecision() == SolicitudDestinatario.DecisionEnum.PENDIENTE)
+                    .map(SolicitudDestinatario::getUsuarioId)
+                    .collect(Collectors.toSet());
+            
+            List<Integer> procesadoresDuplicadosEnBD = procesadoresIds.stream()
+                    .filter(idsProcesadoresPendientesActualizados::contains)
+                    .collect(Collectors.toList());
+            
+            if (!procesadoresDuplicadosEnBD.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "Los siguientes usuarios ya están asignados como procesadores pendientes en esta solicitud: " + 
+                        procesadoresDuplicadosEnBD);
+            }
+            
+            throw new IllegalStateException(
+                    "Error al agregar procesadores. Uno o más usuarios ya están asignados a esta solicitud", e);
+        }
+
+        String comentario = String.format("Se agregaron %d procesador(es) a la solicitud: %s",
+                nuevosProcesadores.size(),
+                procesadoresIds.stream()
+                        .map(String::valueOf)
+                        .collect(Collectors.joining(", ")));
+        
+        crearHistorial(solicitud, solicitud.getIdSolicitante(),
+                SolicitudHistorial.AccionEnum.CREAR, comentario);
+
+        enviarNotificacionesNuevosProcesadores(solicitud, nuevosProcesadores);
+
+        log.info("Se agregaron {} procesador(es) a la solicitud {}", nuevosProcesadores.size(), solicitudId);
     }
 
     // ================ MÉTODOS AUXILIARES ================
@@ -699,6 +800,81 @@ public class SolicitudService {
             log.error("Error al notificar siguiente aprobador para solicitud {}: {}", 
                     solicitud.getId(), e.getMessage(), e);
             // No lanzar excepción para evitar que falle el proceso de aprobación
+        }
+    }
+
+    /**
+     * Envía notificaciones por correo a los nuevos procesadores agregados a una solicitud
+     * @param solicitud La solicitud a la que se agregaron procesadores
+     * @param nuevosProcesadores Lista de los nuevos procesadores agregados
+     */
+    private void enviarNotificacionesNuevosProcesadores(Solicitud solicitud, 
+                                                         List<SolicitudDestinatario> nuevosProcesadores) {
+        try {
+            if (nuevosProcesadores.isEmpty()) {
+                log.warn("No hay nuevos procesadores para notificar en solicitud {}", solicitud.getId());
+                return;
+            }
+
+            // Obtener información del solicitante
+            Usuario solicitante = usuarioRepository.findById(solicitud.getIdSolicitante()).orElse(null);
+            String nombreSolicitante = solicitante != null ? 
+                    Stream.of(solicitante.getNombres(), solicitante.getApellidos())
+                            .filter(Objects::nonNull)
+                            .map(String::trim)
+                            .filter(str -> !str.isEmpty())
+                            .collect(Collectors.joining(" ")) : "Usuario";
+
+            // Obtener información de los nuevos procesadores
+            List<Integer> idsProcesadores = nuevosProcesadores.stream()
+                    .map(SolicitudDestinatario::getUsuarioId)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            Map<Integer, Usuario> usuariosProcesadores = usuarioRepository.findByIdUsuarioIn(idsProcesadores)
+                    .stream()
+                    .collect(Collectors.toMap(Usuario::getIdUsuario, Function.identity()));
+
+            boolean esOrdenSecuencial = Boolean.TRUE.equals(solicitud.getOrdenFirmaBoolean());
+
+            // Notificar a todos los nuevos procesadores
+            for (SolicitudDestinatario procesador : nuevosProcesadores) {
+                Usuario usuario = usuariosProcesadores.get(procesador.getUsuarioId());
+                if (usuario != null && usuario.getCorreoEmpresarial() != null && 
+                    !usuario.getCorreoEmpresarial().trim().isEmpty()) {
+                    
+                    // Determinar si es el siguiente aprobador en orden secuencial
+                    boolean esSiguienteAprobador = false;
+                    if (esOrdenSecuencial) {
+                        List<SolicitudDestinatario> pendientes = destinatarioRepository
+                                .findPendientesBySolicitudId(solicitud.getId());
+                        if (!pendientes.isEmpty()) {
+                            esSiguienteAprobador = pendientes.get(0).getUsuarioId()
+                                    .equals(procesador.getUsuarioId());
+                        }
+                    }
+                    
+                    emailService.enviarNotificacionNuevaSolicitud(
+                            usuario.getCorreoEmpresarial(),
+                            solicitud.getId(),
+                            solicitud.getNombreSolicitud(),
+                            nombreSolicitante,
+                            esOrdenSecuencial,
+                            esSiguienteAprobador
+                    );
+                    
+                    log.info("Notificación enviada al nuevo procesador (usuario {}) para solicitud {}",
+                            procesador.getUsuarioId(), solicitud.getId());
+                }
+            }
+
+            log.info("Notificaciones enviadas a {} nuevo(s) procesador(es) para solicitud {}",
+                    nuevosProcesadores.size(), solicitud.getId());
+
+        } catch (Exception e) {
+            log.error("Error al enviar notificaciones a nuevos procesadores para solicitud {}: {}", 
+                    solicitud.getId(), e.getMessage(), e);
+            // No lanzar excepción para evitar que falle la adición de procesadores
         }
     }
 

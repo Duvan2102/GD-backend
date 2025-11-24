@@ -8,7 +8,7 @@ import java.util.List;
 
 @Data
 @Builder
-class ErrorResponse {
+public class ErrorResponse {
     private LocalDateTime timestamp;
     private String path;
     private String code;

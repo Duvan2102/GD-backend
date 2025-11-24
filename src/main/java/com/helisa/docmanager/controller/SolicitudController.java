@@ -5,6 +5,7 @@ import com.helisa.docmanager.dto.response.SolicitudDetalleResponse;
 import com.helisa.docmanager.dto.response.SolicitudResumenResponse;
 import com.helisa.docmanager.model.CrearSolicitudRequest;
 import com.helisa.docmanager.model.DecisionRequest;
+import com.helisa.docmanager.model.ProcesadoresRequest;
 import com.helisa.docmanager.model.Usuario;
 import com.helisa.docmanager.repository.UsuarioRepository;
 import com.helisa.docmanager.service.SolicitudService;
@@ -120,7 +121,18 @@ public class SolicitudController {
         solicitudService.cancelar(id, request);
         return ResponseEntity.ok().build();
     }
+    @PostMapping("/{id}/agregar-procesadores")
+    public ResponseEntity<Void> agregarProcesadores(
+            @PathVariable Integer id,
+            @Valid @RequestBody ProcesadoresRequest request,
+            @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
 
+        log.info("Agregando procesadores a la solicitud - ID: {}, Procesadores: {}, CorrelationId: {}",
+                id, request.getProcesadores(), correlationId);
+
+        solicitudService.agregarProcesadores(id, request);
+        return ResponseEntity.ok().build();
+    }
     /**
      * Valida el código 2FA del usuario para confirmar una acción en la solicitud.
      * Este endpoint NO modifica la solicitud, solo valida el código 2FA.
