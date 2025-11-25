@@ -14,7 +14,8 @@ import java.time.LocalDateTime;
         @Index(name = "idx_dest_solicitud", columnList = "solicitud_id"),
         @Index(name = "idx_dest_usuario", columnList = "usuario_id"),
         @Index(name = "idx_dest_decision", columnList = "decision"),
-        @Index(name = "idx_dest_orden", columnList = "solicitud_id, orden_index")
+        @Index(name = "idx_dest_orden", columnList = "solicitud_id, orden_index"),
+        @Index(name = "idx_dest_es_procesador", columnList = "es_procesador")
 })
 public class SolicitudDestinatario {
 
@@ -44,6 +45,10 @@ public class SolicitudDestinatario {
 
     @Column(name = "fecha_decision")
     private LocalDateTime fechaDecision;
+
+    @NotNull
+    @Column(name = "es_procesador", nullable = false)
+    private Boolean esProcesador = false;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

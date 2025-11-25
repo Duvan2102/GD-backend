@@ -295,7 +295,7 @@ public class SolicitudController {
 
     @GetMapping("/para-gestionar")
     public ResponseEntity<Page<SolicitudResumenResponse>> listarParaGestionar(
-            @RequestParam Integer usuarioId,  // Corregido a Integer
+            @RequestParam Integer usuarioId,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.ASC) Pageable pageable,
             @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
 
@@ -304,6 +304,20 @@ public class SolicitudController {
 
         Page<SolicitudResumenResponse> solicitudes =
                 solicitudService.listarParaGestionar(usuarioId, pageable);
+        return ResponseEntity.ok(solicitudes);
+    }
+
+    @GetMapping("/para-procesar")
+    public ResponseEntity<Page<SolicitudResumenResponse>> listarParaProcesar(
+            @RequestParam Integer usuarioId,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.ASC) Pageable pageable,
+            @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
+
+        log.info("Listando solicitudes para procesar - Usuario: {}, CorrelationId: {}",
+                usuarioId, correlationId);
+
+        Page<SolicitudResumenResponse> solicitudes =
+                solicitudService.listarParaProcesar(usuarioId, pageable);
         return ResponseEntity.ok(solicitudes);
     }
 

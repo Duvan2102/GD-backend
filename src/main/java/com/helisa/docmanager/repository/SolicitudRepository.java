@@ -31,11 +31,17 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, Integer> {
             String descripcion,
             Pageable pageable);
 
-    // Solicitudes pendientes para gestionar
-    @Query("SELECT DISTINCT s FROM Solicitud s JOIN s.destinatariosDetalle d WHERE s.estado.idEstado = 1 AND d.usuarioId = :usuarioId AND d.decision = 'PENDIENTE' AND (s.ordenFirmaBoolean = false OR (s.ordenFirmaBoolean = true AND d.ordenIndex = (SELECT MIN(d2.ordenIndex) FROM SolicitudDestinatario d2 WHERE d2.solicitud = s AND d2.decision = 'PENDIENTE')))")
+    // Solicitudes pendientes para gestionar (aprobadores en estado PENDIENTE)
+    @Query("SELECT DISTINCT s FROM Solicitud s JOIN s.destinatariosDetalle d WHERE s.estado.idEstado = 1 AND d.usuarioId = :usuarioId AND d.decision = 'PENDIENTE' AND d.esProcesador = false AND (s.ordenFirmaBoolean = false OR (s.ordenFirmaBoolean = true AND d.ordenIndex = (SELECT MIN(d2.ordenIndex) FROM SolicitudDestinatario d2 WHERE d2.solicitud = s AND d2.decision = 'PENDIENTE' AND d2.esProcesador = false)))")
     Page<Solicitud> findPendientesParaGestionar(
             @Param("usuarioId") Integer usuarioId,
             @Param("ordenSecuencial") boolean ordenSecuencial,
+            Pageable pageable);
+
+    // Solicitudes pendientes para procesar (procesadores en estado APROB_PENDIENTE, siempre secuencial)
+    @Query("SELECT DISTINCT s FROM Solicitud s JOIN s.destinatariosDetalle d WHERE s.estado.idEstado = 9 AND d.usuarioId = :usuarioId AND d.decision = 'PENDIENTE' AND d.esProcesador = true AND d.ordenIndex = (SELECT MIN(d2.ordenIndex) FROM SolicitudDestinatario d2 WHERE d2.solicitud = s AND d2.decision = 'PENDIENTE' AND d2.esProcesador = true)")
+    Page<Solicitud> findPendientesParaProcesar(
+            @Param("usuarioId") Integer usuarioId,
             Pageable pageable);
 
     // Histórico del usuario

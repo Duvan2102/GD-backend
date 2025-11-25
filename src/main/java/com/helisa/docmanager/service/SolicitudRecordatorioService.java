@@ -43,12 +43,20 @@ public class SolicitudRecordatorioService {
             return; // fuera de franja horaria
         }
 
-        List<Solicitud> pendientes = solicitudRepository
+        List<Solicitud> pendientesPrimeraRonda = solicitudRepository
                 .findByEstado_IdEstadoAndEnviarRecordatorioGreaterThan(Solicitud.ESTADO_PENDIENTE_ID, 0);
+        
+        List<Solicitud> pendientesSegundaRonda = solicitudRepository
+                .findByEstado_IdEstadoAndEnviarRecordatorioGreaterThan(Solicitud.ESTADO_APROBADO_PROCESO_ID, 0);
 
         LocalDate hoyBogota = LocalDate.now(ZONA_BOGOTA);
 
-        for (Solicitud solicitud : pendientes) {
+        procesarRecordatoriosParaSolicitudes(pendientesPrimeraRonda, hoyBogota, false);
+        procesarRecordatoriosParaSolicitudes(pendientesSegundaRonda, hoyBogota, true);
+    }
+
+    private void procesarRecordatoriosParaSolicitudes(List<Solicitud> solicitudes, LocalDate hoyBogota, boolean esSegundaRonda) {
+        for (Solicitud solicitud : solicitudes) {
             Integer periodoDias = solicitud.getEnviarRecordatorio();
             if (periodoDias == null || periodoDias <= 0) continue;
 
@@ -62,34 +70,32 @@ public class SolicitudRecordatorioService {
 
             long diasTranscurridos = java.time.temporal.ChronoUnit.DAYS.between(fechaBase, hoyBogota);
             if (diasTranscurridos <= 0) {
-                continue; // aún no cumple ni un día
+                continue;
             }
 
             if (diasTranscurridos % periodoDias != 0) {
-                continue; // hoy no es un múltiplo exacto del periodo
+                continue;
             }
 
-            if (!solicitud.estaPendiente() || solicitud.estaCancelado()) {
-                continue; // sólo enviar si sigue pendiente y no cancelada
+            if (solicitud.estaCancelado()) {
+                continue;
             }
 
-            // Determinar destinatarios pendientes
+            Boolean esProcesador = esSegundaRonda;
             List<SolicitudDestinatario> pendientesDest = destinatarioRepository
-                    .findPendientesBySolicitudId(solicitud.getId());
+                    .findPendientesBySolicitudId(solicitud.getId(), esProcesador);
 
             if (pendientesDest.isEmpty()) {
-                continue; // nada que notificar
+                continue;
             }
 
-            if (solicitud.esOrdenSecuencial()) {
-                // Enviar solo al menor ordenIndex pendiente
+            if (esSegundaRonda || solicitud.esOrdenSecuencial()) {
                 int menorOrden = pendientesDest.get(0).getOrdenIndex();
                 List<SolicitudDestinatario> objetivo = pendientesDest.stream()
                         .filter(d -> d.getOrdenIndex() == menorOrden)
                         .collect(Collectors.toList());
                 enviarCorreosRecordatorio(solicitud, objetivo);
             } else {
-                // Enviar a todos los pendientes
                 enviarCorreosRecordatorio(solicitud, pendientesDest);
             }
         }

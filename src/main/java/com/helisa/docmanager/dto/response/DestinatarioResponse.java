@@ -18,4 +18,5 @@ public class DestinatarioResponse {
     private String decision;
     private LocalDateTime fechaDecision;
     private String comentario;
+    private Boolean esProcesador;
 }

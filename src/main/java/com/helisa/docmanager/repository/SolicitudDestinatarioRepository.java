@@ -24,19 +24,31 @@ public interface SolicitudDestinatarioRepository extends JpaRepository<Solicitud
             @Param("solicitudId") Integer solicitudId);
 
     // Buscar pendientes ordenados (para flujo secuencial)
-    @Query("SELECT d FROM SolicitudDestinatario d WHERE d.solicitud.id = :solicitudId AND d.decision = 'PENDIENTE' ORDER BY d.ordenIndex ASC")
+    @Query("SELECT d FROM SolicitudDestinatario d WHERE d.solicitud.id = :solicitudId AND d.decision = 'PENDIENTE' AND d.esProcesador = :esProcesador ORDER BY d.ordenIndex ASC")
     List<SolicitudDestinatario> findPendientesBySolicitudId(
-            @Param("solicitudId") Integer solicitudId);
+            @Param("solicitudId") Integer solicitudId,
+            @Param("esProcesador") Boolean esProcesador);
 
     // Contar aprobados
-    @Query("SELECT COUNT(d) FROM SolicitudDestinatario d WHERE d.solicitud.id = :solicitudId AND d.decision = 'APROBADO'")
-    Long countAprobadosBySolicitudId(@Param("solicitudId") Integer solicitudId);
+    @Query("SELECT COUNT(d) FROM SolicitudDestinatario d WHERE d.solicitud.id = :solicitudId AND d.decision = 'APROBADO' AND d.esProcesador = :esProcesador")
+    Long countAprobadosBySolicitudId(
+            @Param("solicitudId") Integer solicitudId,
+            @Param("esProcesador") Boolean esProcesador);
 
     // Contar total
-    @Query("SELECT COUNT(d) FROM SolicitudDestinatario d WHERE d.solicitud.id = :solicitudId")
-    Long countTotalBySolicitudId(@Param("solicitudId") Integer solicitudId);
+    @Query("SELECT COUNT(d) FROM SolicitudDestinatario d WHERE d.solicitud.id = :solicitudId AND d.esProcesador = :esProcesador")
+    Long countTotalBySolicitudId(
+            @Param("solicitudId") Integer solicitudId,
+            @Param("esProcesador") Boolean esProcesador);
 
     // Verificar si todos aprobaron
-    @Query("SELECT CASE WHEN COUNT(d) = 0 THEN true ELSE false END FROM SolicitudDestinatario d WHERE d.solicitud.id = :solicitudId AND d.decision != 'APROBADO'")
-    boolean todosAprobaron(@Param("solicitudId") Integer solicitudId);
+    @Query("SELECT CASE WHEN COUNT(d) = 0 THEN true ELSE false END FROM SolicitudDestinatario d WHERE d.solicitud.id = :solicitudId AND d.decision != 'APROBADO' AND d.esProcesador = :esProcesador")
+    boolean todosAprobaron(
+            @Param("solicitudId") Integer solicitudId,
+            @Param("esProcesador") Boolean esProcesador);
+
+    // Buscar pendientes procesadores ordenados (para segunda ronda)
+    @Query("SELECT d FROM SolicitudDestinatario d WHERE d.solicitud.id = :solicitudId AND d.decision = 'PENDIENTE' AND d.esProcesador = true ORDER BY d.ordenIndex ASC")
+    List<SolicitudDestinatario> findPendientesProcesadoresBySolicitudId(
+            @Param("solicitudId") Integer solicitudId);
 }

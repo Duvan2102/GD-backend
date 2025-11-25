@@ -170,6 +170,7 @@ public class AuditService {
                             .decision(dest.getDecision() != null ? dest.getDecision().name() : null)
                             .fechaDecision(dest.getFechaDecision())
                             .comentario(dest.getComentario())
+                            .esProcesador(dest.getEsProcesador())
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -196,9 +197,12 @@ public class AuditService {
                         .build())
                 .collect(Collectors.toList());
         
-        // Contar aprobaciones
-        Long aprobados = destinatarioRepository.countAprobadosBySolicitudId(solicitud.getId());
-        Long total = destinatarioRepository.countTotalBySolicitudId(solicitud.getId());
+        boolean esPrimeraRonda = solicitud.estaPendiente();
+        boolean esSegundaRonda = solicitud.estaAprobadoProceso();
+        Boolean esProcesador = esSegundaRonda;
+        
+        Long aprobados = destinatarioRepository.countAprobadosBySolicitudId(solicitud.getId(), esProcesador);
+        Long total = destinatarioRepository.countTotalBySolicitudId(solicitud.getId(), esProcesador);
         
         return AuditSolicitudResponse.builder()
                 .id(solicitud.getId())

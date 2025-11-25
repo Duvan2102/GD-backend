@@ -1,5 +1,6 @@
 package com.helisa.docmanager.service;
 
+import com.helisa.docmanager.model.Solicitud;
 import com.helisa.docmanager.model.SolicitudDestinatario;
 import com.helisa.docmanager.repository.SolicitudDestinatarioRepository;
 import com.helisa.docmanager.repository.SolicitudRepository;
@@ -24,6 +25,22 @@ public class FlujoAprobacionService {
     
     @Transactional(readOnly = true)
     public boolean puedeAprobar(Integer solicitudId, Integer usuarioId, boolean ordenFirma) {
+        Optional<Solicitud> solicitudOpt = solicitudRepository.findById(solicitudId);
+        if (solicitudOpt.isEmpty()) {
+            return false;
+        }
+        
+        Solicitud solicitud = solicitudOpt.get();
+        boolean esPrimeraRonda = solicitud.estaPendiente();
+        boolean esSegundaRonda = solicitud.estaAprobadoProceso();
+        
+        if (!esPrimeraRonda && !esSegundaRonda) {
+            log.debug("Solicitud {} no está en estado válido para aprobar", solicitudId);
+            return false;
+        }
+        
+        Boolean esProcesador = esSegundaRonda;
+        
         Optional<SolicitudDestinatario> destinatario =
                 destinatarioRepository.findBySolicitudIdAndUsuarioId(solicitudId, usuarioId);
 
@@ -33,15 +50,23 @@ public class FlujoAprobacionService {
                     usuarioId, solicitudId);
             return false;
         }
+        
+        if (!destinatario.get().getEsProcesador().equals(esProcesador)) {
+            log.debug("Usuario {} no es del tipo correcto para esta ronda (esProcesador: {}, ronda: {})",
+                    usuarioId, destinatario.get().getEsProcesador(), esSegundaRonda ? "segunda" : "primera");
+            return false;
+        }
 
-        if (!ordenFirma) {
+        boolean requiereOrden = esSegundaRonda || ordenFirma;
+        
+        if (!requiereOrden) {
             log.debug("Solicitud {} no requiere orden, usuario {} puede aprobar",
                     solicitudId, usuarioId);
             return true;
         }
 
         List<SolicitudDestinatario> pendientes =
-                destinatarioRepository.findPendientesBySolicitudId(solicitudId);
+                destinatarioRepository.findPendientesBySolicitudId(solicitudId, esProcesador);
 
         boolean puedeAprobar = !pendientes.isEmpty() &&
                 pendientes.get(0).getUsuarioId().equals(usuarioId);
@@ -54,41 +79,84 @@ public class FlujoAprobacionService {
 
     @Transactional(readOnly = true)
     public boolean todosAprobaron(Integer solicitudId) {
-        Long aprobados = destinatarioRepository.countAprobadosBySolicitudId(solicitudId);
-        Long total = destinatarioRepository.countTotalBySolicitudId(solicitudId);
+        Optional<Solicitud> solicitudOpt = solicitudRepository.findById(solicitudId);
+        if (solicitudOpt.isEmpty()) {
+            return false;
+        }
+        
+        Solicitud solicitud = solicitudOpt.get();
+        boolean esPrimeraRonda = solicitud.estaPendiente();
+        boolean esSegundaRonda = solicitud.estaAprobadoProceso();
+        
+        if (!esPrimeraRonda && !esSegundaRonda) {
+            return false;
+        }
+        
+        Boolean esProcesador = esSegundaRonda;
+        
+        Long aprobados = destinatarioRepository.countAprobadosBySolicitudId(solicitudId, esProcesador);
+        Long total = destinatarioRepository.countTotalBySolicitudId(solicitudId, esProcesador);
 
         boolean todoAprobado = aprobados.equals(total);
 
-        log.debug("Solicitud {} - Aprobados: {}/{}, Todos aprobaron: {}",
-                solicitudId, aprobados, total, todoAprobado);
+        log.debug("Solicitud {} - Aprobados: {}/{}, Todos aprobaron: {} (ronda: {})",
+                solicitudId, aprobados, total, todoAprobado, esSegundaRonda ? "segunda" : "primera");
 
         return todoAprobado;
     }
 
     @Transactional(readOnly = true)
     public SolicitudDestinatario obtenerSiguienteAprobador(Integer solicitudId) {
+        Optional<Solicitud> solicitudOpt = solicitudRepository.findById(solicitudId);
+        if (solicitudOpt.isEmpty()) {
+            return null;
+        }
+        
+        Solicitud solicitud = solicitudOpt.get();
+        boolean esPrimeraRonda = solicitud.estaPendiente();
+        boolean esSegundaRonda = solicitud.estaAprobadoProceso();
+        
+        if (!esPrimeraRonda && !esSegundaRonda) {
+            return null;
+        }
+        
+        Boolean esProcesador = esSegundaRonda;
+        
         List<SolicitudDestinatario> pendientes =
-                destinatarioRepository.findPendientesBySolicitudId(solicitudId);
+                destinatarioRepository.findPendientesBySolicitudId(solicitudId, esProcesador);
 
         if (pendientes.isEmpty()) {
-            log.debug("No hay aprobadores pendientes para solicitud {}", solicitudId);
+            log.debug("No hay {} pendientes para solicitud {}",
+                    esSegundaRonda ? "procesadores" : "aprobadores", solicitudId);
             return null;
         }
 
         SolicitudDestinatario siguiente = pendientes.get(0);
-        log.debug("Siguiente aprobador para solicitud {}: usuario {}",
-                solicitudId, siguiente.getUsuarioId());
+        log.debug("Siguiente {} para solicitud {}: usuario {}",
+                esSegundaRonda ? "procesador" : "aprobador", solicitudId, siguiente.getUsuarioId());
 
         return siguiente;
     }
 
     @Transactional(readOnly = true)
     public boolean puedeRechazar(Integer solicitudId, Integer usuarioId) {
+        Optional<Solicitud> solicitudOpt = solicitudRepository.findById(solicitudId);
+        if (solicitudOpt.isEmpty()) {
+            return false;
+        }
+        
+        Solicitud solicitud = solicitudOpt.get();
+        if (!solicitud.estaPendiente()) {
+            log.debug("Solicitud {} no está en estado PENDIENTE, no se puede rechazar", solicitudId);
+            return false;
+        }
+        
         Optional<SolicitudDestinatario> destinatario =
                 destinatarioRepository.findBySolicitudIdAndUsuarioId(solicitudId, usuarioId);
 
         boolean puedeRechazar = destinatario.isPresent() &&
-                destinatario.get().getDecision() == SolicitudDestinatario.DecisionEnum.PENDIENTE;
+                destinatario.get().getDecision() == SolicitudDestinatario.DecisionEnum.PENDIENTE &&
+                !destinatario.get().getEsProcesador();
 
         log.debug("Usuario {} {} rechazar solicitud {}",
                 usuarioId, puedeRechazar ? "puede" : "no puede", solicitudId);
@@ -121,8 +189,23 @@ public class FlujoAprobacionService {
 
     @Transactional(readOnly = true)
     public ProgresoAprobacion obtenerProgreso(Integer solicitudId) {
-        Long aprobados = destinatarioRepository.countAprobadosBySolicitudId(solicitudId);
-        Long total = destinatarioRepository.countTotalBySolicitudId(solicitudId);
+        Optional<Solicitud> solicitudOpt = solicitudRepository.findById(solicitudId);
+        if (solicitudOpt.isEmpty()) {
+            return null;
+        }
+        
+        Solicitud solicitud = solicitudOpt.get();
+        boolean esPrimeraRonda = solicitud.estaPendiente();
+        boolean esSegundaRonda = solicitud.estaAprobadoProceso();
+        
+        if (!esPrimeraRonda && !esSegundaRonda) {
+            return null;
+        }
+        
+        Boolean esProcesador = esSegundaRonda;
+        
+        Long aprobados = destinatarioRepository.countAprobadosBySolicitudId(solicitudId, esProcesador);
+        Long total = destinatarioRepository.countTotalBySolicitudId(solicitudId, esProcesador);
         SolicitudDestinatario siguiente = obtenerSiguienteAprobador(solicitudId);
 
         return ProgresoAprobacion.builder()

@@ -126,7 +126,6 @@ public class SolicitudService {
         Solicitud solicitud = solicitudRepository.findById(solicitudId)
                 .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
 
-        // Verificar el estado de la solicitud y proporcionar mensajes descriptivos
         if (solicitud.estaAprobado()) {
             throw new IllegalStateException("La solicitud ya fue aprobada anteriormente");
         }
@@ -139,8 +138,11 @@ public class SolicitudService {
             throw new IllegalStateException("La solicitud fue cancelada y no puede ser aprobada");
         }
         
-        if (!solicitud.estaPendiente()) {
-            throw new IllegalStateException("La solicitud no está en estado PENDIENTE");
+        boolean esPrimeraRonda = solicitud.estaPendiente();
+        boolean esSegundaRonda = solicitud.estaAprobadoProceso();
+        
+        if (!esPrimeraRonda && !esSegundaRonda) {
+            throw new IllegalStateException("La solicitud no está en estado válido para aprobar (debe estar PENDIENTE o APROB_PENDIENTE)");
         }
 
         if (!flujoService.puedeAprobar(solicitudId, request.getUsuarioId(),
@@ -152,43 +154,56 @@ public class SolicitudService {
                 .findBySolicitudIdAndUsuarioId(solicitudId, request.getUsuarioId())
                 .orElseThrow(() -> new IllegalStateException("Destinatario no encontrado"));
 
+        if (esPrimeraRonda && destinatario.getEsProcesador()) {
+            throw new IllegalStateException("Los procesadores no pueden aprobar en la primera ronda");
+        }
+        
+        if (esSegundaRonda && !destinatario.getEsProcesador()) {
+            throw new IllegalStateException("Los aprobadores no pueden aprobar en la segunda ronda");
+        }
+
         destinatario.aprobar(request.getComentario());
         destinatarioRepository.save(destinatario);
 
         if (flujoService.todosAprobaron(solicitudId)) {
-            // Cambiar estado a APROBADO
-            boolean requiereProceso = solicitud.getTipologia().getRequiereProceso();
-            if (requiereProceso) {
-                // Crear proceso
-                Estado estadoAprobPendiente = estadoRepository.getEstadoaAprobPendiente();
-                solicitud.setEstado(estadoAprobPendiente);
-                solicitudRepository.save(solicitud);
-
-            }else{
-                // Cambiar estado a APROBADO
+            if (esPrimeraRonda) {
+                boolean requiereProceso = solicitud.getTipologia().getRequiereProceso();
+                if (requiereProceso) {
+                    Estado estadoAprobPendiente = estadoRepository.getEstadoaAprobPendiente();
+                    solicitud.setEstado(estadoAprobPendiente);
+                    solicitudRepository.save(solicitud);
+                    crearHistorial(solicitud, request.getUsuarioId(), SolicitudHistorial.AccionEnum.APROBAR,
+                            "Solicitud aprobada por todos los aprobadores, iniciando proceso");
+                } else {
+                    Estado estadoAprobado = estadoRepository.getEstadoAprobado();
+                    solicitud.setEstado(estadoAprobado);
+                    solicitudRepository.save(solicitud);
+                    crearHistorial(solicitud, request.getUsuarioId(), SolicitudHistorial.AccionEnum.APROBAR,
+                            "Solicitud aprobada por todos los destinatarios");
+                }
+            } else {
                 Estado estadoAprobado = estadoRepository.getEstadoAprobado();
                 solicitud.setEstado(estadoAprobado);
                 solicitudRepository.save(solicitud);
-                crearHistorial(solicitud, request.getUsuarioId(),SolicitudHistorial.AccionEnum.APROBAR,
-                        "Solicitud aprobada por todos los destinatarios");
+                crearHistorial(solicitud, request.getUsuarioId(), SolicitudHistorial.AccionEnum.APROBAR,
+                        "Solicitud aprobada por todos los procesadores");
             }
-
         } else {
-            // Si aún quedan aprobadores y la solicitud tiene orden secuencial,
-            // notificar al siguiente aprobador
-            if (Boolean.TRUE.equals(solicitud.getOrdenFirmaBoolean())) {
+            if (esPrimeraRonda && Boolean.TRUE.equals(solicitud.getOrdenFirmaBoolean())) {
                 notificarSiguienteAprobador(solicitud);
+            } else if (esSegundaRonda) {
+                notificarSiguienteProcesador(solicitud);
             }
         }
 
-        log.info("Solicitud {} aprobada por usuario {}", solicitudId, request.getUsuarioId());
+        log.info("Solicitud {} aprobada por usuario {} en {} ronda", 
+                solicitudId, request.getUsuarioId(), esSegundaRonda ? "segunda" : "primera");
     }
 
     public void rechazar(Integer solicitudId, DecisionRequest request) {
         Solicitud solicitud = solicitudRepository.findById(solicitudId)
                 .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
 
-        // Verificar el estado de la solicitud y proporcionar mensajes descriptivos
         if (solicitud.estaAprobado()) {
             throw new IllegalStateException("La solicitud ya fue aprobada y no puede ser rechazada");
         }
@@ -202,14 +217,17 @@ public class SolicitudService {
         }
         
         if (!solicitud.estaPendiente()) {
-            throw new IllegalStateException("La solicitud no está en estado PENDIENTE");
+            throw new IllegalStateException("Solo se puede rechazar en la primera ronda (estado PENDIENTE)");
         }
 
         SolicitudDestinatario destinatario = destinatarioRepository
                 .findBySolicitudIdAndUsuarioId(solicitudId, request.getUsuarioId())
                 .orElseThrow(() -> new IllegalStateException("Usuario no autorizado para rechazar"));
 
-        // Cambiar estado a RECHAZADO
+        if (destinatario.getEsProcesador()) {
+            throw new IllegalStateException("Los procesadores no pueden rechazar solicitudes");
+        }
+
         Estado estadoRechazado = estadoRepository.getEstadoRechazado();
         solicitud.setEstado(estadoRechazado);
         solicitudRepository.save(solicitud);
@@ -217,10 +235,6 @@ public class SolicitudService {
         destinatario.rechazar(request.getComentario());
         destinatarioRepository.save(destinatario);
 
-        // NOTA: Los archivos NO se eliminan cuando se rechaza una solicitud
-        // para mantener un historial completo de documentos
-
-        // Crear historial
         crearHistorial(solicitud, request.getUsuarioId(),
                 SolicitudHistorial.AccionEnum.RECHAZAR, request.getComentario());
 
@@ -279,9 +293,9 @@ public class SolicitudService {
         Solicitud solicitud = solicitudRepository.findById(solicitudId)
                 .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
 
-        if (!solicitud.estaAprobadoOProceso()) {
+        if (!solicitud.estaAprobadoProceso()) {
             throw new IllegalStateException(
-                    "Solo se pueden agregar procesadores a solicitudes que han sido aprobadas por todos los destinatarios. " +
+                    "Solo se pueden agregar procesadores a solicitudes en estado APROB_PENDIENTE. " +
                     "Estado actual: " + (solicitud.getEstado() != null ? solicitud.getEstado().getDescripcion() : "DESCONOCIDO"));
         }
 
@@ -302,7 +316,7 @@ public class SolicitudService {
                 .findBySolicitudId(solicitudId);
 
         Set<Integer> idsProcesadoresPendientes = destinatariosExistentes.stream()
-                .filter(d -> d.getDecision() == SolicitudDestinatario.DecisionEnum.PENDIENTE)
+                .filter(d -> d.getDecision() == SolicitudDestinatario.DecisionEnum.PENDIENTE && d.getEsProcesador())
                 .map(SolicitudDestinatario::getUsuarioId)
                 .collect(Collectors.toSet());
         
@@ -330,6 +344,7 @@ public class SolicitudService {
             procesador.setUsuarioId(procesadorId);
             procesador.setOrdenIndex(siguienteOrden++);
             procesador.setDecision(SolicitudDestinatario.DecisionEnum.PENDIENTE);
+            procesador.setEsProcesador(true);
             nuevosProcesadores.add(procesador);
         }
 
@@ -343,7 +358,7 @@ public class SolicitudService {
                     .findBySolicitudId(solicitudId);
             
             Set<Integer> idsProcesadoresPendientesActualizados = destinatariosActualizados.stream()
-                    .filter(d -> d.getDecision() == SolicitudDestinatario.DecisionEnum.PENDIENTE)
+                    .filter(d -> d.getDecision() == SolicitudDestinatario.DecisionEnum.PENDIENTE && d.getEsProcesador())
                     .map(SolicitudDestinatario::getUsuarioId)
                     .collect(Collectors.toSet());
             
@@ -417,6 +432,7 @@ public class SolicitudService {
                         .decision(dest.getDecision().name())
                         .fechaDecision(dest.getFechaDecision())
                         .comentario(dest.getComentario())
+                        .esProcesador(dest.getEsProcesador())
                         .build())
                 .collect(Collectors.toList());
 
@@ -426,18 +442,21 @@ public class SolicitudService {
                 .map(h -> HistorialResponse.builder()
                         .id(h.getId())
                         .actorUsuarioId(h.getActorUsuarioId())
-                        .nombreUsuario(h.getNombreUsuario()) // Ahora incluye el nombre
+                        .nombreUsuario(h.getNombreUsuario())
                         .accion(h.getAccion().name())
                         .comentario(h.getComentario())
                         .fecha(h.getFecha())
                         .build())
                 .collect(Collectors.toList());
 
-        // Obtener el comentario inicial del primer registro del historial
         String descripcionSolicitud = historial.isEmpty() ? null : historial.get(0).getComentario();
 
-        Long aprobados = destinatarioRepository.countAprobadosBySolicitudId(solicitud.getId());
-        Long total = destinatarioRepository.countTotalBySolicitudId(solicitud.getId());
+        boolean esPrimeraRonda = solicitud.estaPendiente();
+        boolean esSegundaRonda = solicitud.estaAprobadoProceso();
+        Boolean esProcesador = esSegundaRonda;
+        
+        Long aprobados = destinatarioRepository.countAprobadosBySolicitudId(solicitud.getId(), esProcesador);
+        Long total = destinatarioRepository.countTotalBySolicitudId(solicitud.getId(), esProcesador);
 
         // Obtener información de la tipología
         String descripcionTipologia = null;
@@ -515,22 +534,25 @@ public class SolicitudService {
                                     .collect(Collectors.joining(" "));
                     return DestinatarioResponse.builder()
                             .usuarioId(d.getUsuarioId())
-                            .nombre(nombre) // <-- nuevo en tu DTO
+                            .nombre(nombre)
                             .ordenIndex(d.getOrdenIndex())
                             .decision(d.getDecision() != null ? d.getDecision().name() : null)
                             .fechaDecision(d.getFechaDecision())
                             .comentario(d.getComentario())
+                            .esProcesador(d.getEsProcesador())
                             .build();
                 })
                 .toList();
 
-        int total = destinatarios.size();
-        int aprobados = (int) destinatarios.stream()
-                .map(DestinatarioResponse::getDecision)
-                .filter(Objects::nonNull)
-                .map(String::toUpperCase)
-                .filter("APROBADO"::equals)
-                .count();
+        boolean esPrimeraRonda = s.estaPendiente();
+        boolean esSegundaRonda = s.estaAprobadoProceso();
+        Boolean esProcesador = esSegundaRonda;
+        
+        Long aprobadosCount = destinatarioRepository.countAprobadosBySolicitudId(s.getId(), esProcesador);
+        Long totalCount = destinatarioRepository.countTotalBySolicitudId(s.getId(), esProcesador);
+        
+        int total = totalCount.intValue();
+        int aprobados = aprobadosCount.intValue();
 
         return SolicitudResumenResponse.builder()
                 .id(s.getId())
@@ -614,6 +636,7 @@ public class SolicitudService {
             destinatario.setUsuarioId(destinatariosIds[i]);
             destinatario.setOrdenIndex(i);
             destinatario.setDecision(SolicitudDestinatario.DecisionEnum.PENDIENTE);
+            destinatario.setEsProcesador(false);
             destinatarios.add(destinatario);
         }
 
@@ -660,12 +683,11 @@ public class SolicitudService {
      */
     private void enviarNotificacionesNuevaSolicitud(Solicitud solicitud) {
         try {
-            // Obtener todos los destinatarios de la solicitud
             List<SolicitudDestinatario> destinatarios = destinatarioRepository
-                    .findBySolicitudId(solicitud.getId());
+                    .findPendientesBySolicitudId(solicitud.getId(), false);
 
             if (destinatarios.isEmpty()) {
-                log.warn("No hay destinatarios para notificar en solicitud {}", solicitud.getId());
+                log.warn("No hay aprobadores para notificar en solicitud {}", solicitud.getId());
                 return;
             }
 
@@ -799,7 +821,56 @@ public class SolicitudService {
         } catch (Exception e) {
             log.error("Error al notificar siguiente aprobador para solicitud {}: {}", 
                     solicitud.getId(), e.getMessage(), e);
-            // No lanzar excepción para evitar que falle el proceso de aprobación
+        }
+    }
+
+    private void notificarSiguienteProcesador(Solicitud solicitud) {
+        try {
+            SolicitudDestinatario siguienteProcesador = flujoService.obtenerSiguienteAprobador(solicitud.getId());
+            
+            if (siguienteProcesador == null) {
+                log.debug("No hay siguiente procesador para notificar en solicitud {}", solicitud.getId());
+                return;
+            }
+
+            Usuario usuarioProcesador = usuarioRepository.findById(siguienteProcesador.getUsuarioId()).orElse(null);
+            
+            if (usuarioProcesador == null) {
+                log.warn("Usuario siguiente procesador no encontrado (ID: {}) para solicitud {}", 
+                        siguienteProcesador.getUsuarioId(), solicitud.getId());
+                return;
+            }
+
+            if (usuarioProcesador.getCorreoEmpresarial() == null || 
+                usuarioProcesador.getCorreoEmpresarial().trim().isEmpty()) {
+                log.warn("Usuario siguiente procesador no tiene correo empresarial (ID: {}) para solicitud {}", 
+                        siguienteProcesador.getUsuarioId(), solicitud.getId());
+                return;
+            }
+
+            Usuario solicitante = usuarioRepository.findById(solicitud.getIdSolicitante()).orElse(null);
+            String nombreSolicitante = solicitante != null ? 
+                    Stream.of(solicitante.getNombres(), solicitante.getApellidos())
+                            .filter(Objects::nonNull)
+                            .map(String::trim)
+                            .filter(str -> !str.isEmpty())
+                            .collect(Collectors.joining(" ")) : "Usuario";
+
+            emailService.enviarNotificacionNuevaSolicitud(
+                    usuarioProcesador.getCorreoEmpresarial(),
+                    solicitud.getId(),
+                    solicitud.getNombreSolicitud(),
+                    nombreSolicitante,
+                    true,
+                    true
+            );
+
+            log.info("Notificación enviada al siguiente procesador (usuario {}) para solicitud {}",
+                    siguienteProcesador.getUsuarioId(), solicitud.getId());
+
+        } catch (Exception e) {
+            log.error("Error al notificar siguiente procesador para solicitud {}: {}", 
+                    solicitud.getId(), e.getMessage(), e);
         }
     }
 
@@ -843,15 +914,12 @@ public class SolicitudService {
                 if (usuario != null && usuario.getCorreoEmpresarial() != null && 
                     !usuario.getCorreoEmpresarial().trim().isEmpty()) {
                     
-                    // Determinar si es el siguiente aprobador en orden secuencial
-                    boolean esSiguienteAprobador = false;
-                    if (esOrdenSecuencial) {
-                        List<SolicitudDestinatario> pendientes = destinatarioRepository
-                                .findPendientesBySolicitudId(solicitud.getId());
-                        if (!pendientes.isEmpty()) {
-                            esSiguienteAprobador = pendientes.get(0).getUsuarioId()
-                                    .equals(procesador.getUsuarioId());
-                        }
+                    boolean esSiguienteProcesador = false;
+                    List<SolicitudDestinatario> pendientes = destinatarioRepository
+                            .findPendientesProcesadoresBySolicitudId(solicitud.getId());
+                    if (!pendientes.isEmpty()) {
+                        esSiguienteProcesador = pendientes.get(0).getUsuarioId()
+                                .equals(procesador.getUsuarioId());
                     }
                     
                     emailService.enviarNotificacionNuevaSolicitud(
@@ -859,8 +927,8 @@ public class SolicitudService {
                             solicitud.getId(),
                             solicitud.getNombreSolicitud(),
                             nombreSolicitante,
-                            esOrdenSecuencial,
-                            esSiguienteAprobador
+                            true,
+                            esSiguienteProcesador
                     );
                     
                     log.info("Notificación enviada al nuevo procesador (usuario {}) para solicitud {}",
@@ -973,6 +1041,13 @@ public class SolicitudService {
     public Page<SolicitudResumenResponse> listarParaGestionar(Integer usuarioId, Pageable pageable) {
         Page<Solicitud> solicitudes = solicitudRepository.findPendientesParaGestionar(
                 usuarioId, true, pageable);
+        return solicitudes.map(this::mapearAResumen);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<SolicitudResumenResponse> listarParaProcesar(Integer usuarioId, Pageable pageable) {
+        Page<Solicitud> solicitudes = solicitudRepository.findPendientesParaProcesar(
+                usuarioId, pageable);
         return solicitudes.map(this::mapearAResumen);
     }
 
