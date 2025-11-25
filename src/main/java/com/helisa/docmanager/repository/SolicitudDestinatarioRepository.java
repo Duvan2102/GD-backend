@@ -18,6 +18,13 @@ public interface SolicitudDestinatarioRepository extends JpaRepository<Solicitud
             @Param("solicitudId") Integer solicitudId,
             @Param("usuarioId") Integer usuarioId);
 
+    // Buscar destinatario específico filtrando por esProcesador
+    @Query("SELECT d FROM SolicitudDestinatario d WHERE d.solicitud.id = :solicitudId AND d.usuarioId = :usuarioId AND d.esProcesador = :esProcesador")
+    Optional<SolicitudDestinatario> findBySolicitudIdAndUsuarioIdAndEsProcesador(
+            @Param("solicitudId") Integer solicitudId,
+            @Param("usuarioId") Integer usuarioId,
+            @Param("esProcesador") Boolean esProcesador);
+
     // Listar todos los destinatarios de una solicitud
     @Query("SELECT d FROM SolicitudDestinatario d WHERE d.solicitud.id = :solicitudId ORDER BY d.ordenIndex ASC")
     List<SolicitudDestinatario> findBySolicitudId(
@@ -51,4 +58,10 @@ public interface SolicitudDestinatarioRepository extends JpaRepository<Solicitud
     @Query("SELECT d FROM SolicitudDestinatario d WHERE d.solicitud.id = :solicitudId AND d.decision = 'PENDIENTE' AND d.esProcesador = true ORDER BY d.ordenIndex ASC")
     List<SolicitudDestinatario> findPendientesProcesadoresBySolicitudId(
             @Param("solicitudId") Integer solicitudId);
+
+    // Verificar si existe un destinatario (sin importar si es procesador o no)
+    @Query("SELECT COUNT(d) > 0 FROM SolicitudDestinatario d WHERE d.solicitud.id = :solicitudId AND d.usuarioId = :usuarioId")
+    boolean existsBySolicitudIdAndUsuarioId(
+            @Param("solicitudId") Integer solicitudId,
+            @Param("usuarioId") Integer usuarioId);
 }

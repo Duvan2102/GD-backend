@@ -42,18 +42,13 @@ public class FlujoAprobacionService {
         Boolean esProcesador = esSegundaRonda;
         
         Optional<SolicitudDestinatario> destinatario =
-                destinatarioRepository.findBySolicitudIdAndUsuarioId(solicitudId, usuarioId);
+                destinatarioRepository.findBySolicitudIdAndUsuarioIdAndEsProcesador(
+                        solicitudId, usuarioId, esProcesador);
 
         if (destinatario.isEmpty() ||
                 destinatario.get().getDecision() != SolicitudDestinatario.DecisionEnum.PENDIENTE) {
             log.debug("Usuario {} no es destinatario o ya decidió en solicitud {}",
                     usuarioId, solicitudId);
-            return false;
-        }
-        
-        if (!destinatario.get().getEsProcesador().equals(esProcesador)) {
-            log.debug("Usuario {} no es del tipo correcto para esta ronda (esProcesador: {}, ronda: {})",
-                    usuarioId, destinatario.get().getEsProcesador(), esSegundaRonda ? "segunda" : "primera");
             return false;
         }
 
@@ -152,11 +147,11 @@ public class FlujoAprobacionService {
         }
         
         Optional<SolicitudDestinatario> destinatario =
-                destinatarioRepository.findBySolicitudIdAndUsuarioId(solicitudId, usuarioId);
+                destinatarioRepository.findBySolicitudIdAndUsuarioIdAndEsProcesador(
+                        solicitudId, usuarioId, false);
 
         boolean puedeRechazar = destinatario.isPresent() &&
-                destinatario.get().getDecision() == SolicitudDestinatario.DecisionEnum.PENDIENTE &&
-                !destinatario.get().getEsProcesador();
+                destinatario.get().getDecision() == SolicitudDestinatario.DecisionEnum.PENDIENTE;
 
         log.debug("Usuario {} {} rechazar solicitud {}",
                 usuarioId, puedeRechazar ? "puede" : "no puede", solicitudId);
@@ -175,8 +170,7 @@ public class FlujoAprobacionService {
                     }
 
                     boolean esDestinatario = destinatarioRepository
-                            .findBySolicitudIdAndUsuarioId(solicitudId, usuarioId)
-                            .isPresent();
+                            .existsBySolicitudIdAndUsuarioId(solicitudId, usuarioId);
 
                     log.debug("Usuario {} {} destinatario, {} cancelar solicitud {}",
                             usuarioId, esDestinatario ? "es" : "no es",

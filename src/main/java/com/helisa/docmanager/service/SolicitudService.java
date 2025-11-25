@@ -150,17 +150,11 @@ public class SolicitudService {
             throw new IllegalStateException("Usuario no autorizado para aprobar en este momento");
         }
 
+        Boolean esProcesador = esSegundaRonda;
         SolicitudDestinatario destinatario = destinatarioRepository
-                .findBySolicitudIdAndUsuarioId(solicitudId, request.getUsuarioId())
+                .findBySolicitudIdAndUsuarioIdAndEsProcesador(
+                        solicitudId, request.getUsuarioId(), esProcesador)
                 .orElseThrow(() -> new IllegalStateException("Destinatario no encontrado"));
-
-        if (esPrimeraRonda && destinatario.getEsProcesador()) {
-            throw new IllegalStateException("Los procesadores no pueden aprobar en la primera ronda");
-        }
-        
-        if (esSegundaRonda && !destinatario.getEsProcesador()) {
-            throw new IllegalStateException("Los aprobadores no pueden aprobar en la segunda ronda");
-        }
 
         destinatario.aprobar(request.getComentario());
         destinatarioRepository.save(destinatario);
@@ -221,12 +215,9 @@ public class SolicitudService {
         }
 
         SolicitudDestinatario destinatario = destinatarioRepository
-                .findBySolicitudIdAndUsuarioId(solicitudId, request.getUsuarioId())
+                .findBySolicitudIdAndUsuarioIdAndEsProcesador(
+                        solicitudId, request.getUsuarioId(), false)
                 .orElseThrow(() -> new IllegalStateException("Usuario no autorizado para rechazar"));
-
-        if (destinatario.getEsProcesador()) {
-            throw new IllegalStateException("Los procesadores no pueden rechazar solicitudes");
-        }
 
         Estado estadoRechazado = estadoRepository.getEstadoRechazado();
         solicitud.setEstado(estadoRechazado);
@@ -265,7 +256,7 @@ public class SolicitudService {
         // Verificar autorización
         boolean esCreador = solicitud.getIdSolicitante().equals(request.getUsuarioId());
         boolean esDestinatario = destinatarioRepository
-                .findBySolicitudIdAndUsuarioId(solicitudId, request.getUsuarioId()).isPresent();
+                .existsBySolicitudIdAndUsuarioId(solicitudId, request.getUsuarioId());
 
         if (!esCreador && !esDestinatario) {
             throw new IllegalStateException("Usuario no autorizado para cancelar");
