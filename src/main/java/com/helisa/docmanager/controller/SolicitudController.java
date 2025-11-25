@@ -27,6 +27,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 import java.net.URLEncoder;
@@ -224,6 +225,20 @@ public class SolicitudController {
 
         log.info("Listando adjuntos - Solicitud: {}, CorrelationId: {}", id, correlationId);
         List<AdjuntoResponse> adjuntos = solicitudService.listarAdjuntos(id);
+        return ResponseEntity.ok(adjuntos);
+    }
+
+    @PostMapping(value = "/{id}/adjuntos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<List<AdjuntoResponse>> agregarAdjuntos(
+            @PathVariable Integer id,
+            @RequestParam("archivos") MultipartFile[] archivos,
+            @RequestParam("usuarioId") Integer usuarioId,
+            @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
+
+        log.info("Agregando adjuntos a solicitud - ID: {}, Archivos: {}, Usuario: {}, CorrelationId: {}",
+                id, archivos != null ? archivos.length : 0, usuarioId, correlationId);
+
+        List<AdjuntoResponse> adjuntos = solicitudService.agregarAdjuntos(id, archivos, usuarioId);
         return ResponseEntity.ok(adjuntos);
     }
 

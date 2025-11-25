@@ -671,6 +671,34 @@ public class SolicitudService {
         adjuntoRepository.saveAll(adjuntosList);
     }
 
+    public List<AdjuntoResponse> agregarAdjuntos(Integer solicitudId, MultipartFile[] archivos, Integer usuarioId) {
+        Solicitud solicitud = solicitudRepository.findById(solicitudId)
+                .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
+
+        if (solicitud.estaRechazado()) {
+            throw new IllegalStateException("No se pueden agregar archivos a una solicitud rechazada");
+        }
+
+        if (solicitud.estaCancelado()) {
+            throw new IllegalStateException("No se pueden agregar archivos a una solicitud cancelada");
+        }
+
+        if (archivos == null || archivos.length == 0) {
+            throw new IllegalArgumentException("Debe proporcionar al menos un archivo");
+        }
+
+        validarAdjuntos(archivos);
+        guardarAdjuntos(solicitud, archivos);
+
+        String comentario = String.format("Se agregaron %d archivo(s) adjunto(s) a la solicitud", archivos.length);
+        crearHistorial(solicitud, usuarioId, SolicitudHistorial.AccionEnum.CREAR, comentario);
+
+        log.info("Se agregaron {} archivo(s) adjunto(s) a la solicitud {} por usuario {}", 
+                archivos.length, solicitudId, usuarioId);
+
+        return listarAdjuntos(solicitudId);
+    }
+
     private void crearHistorial(Solicitud solicitud, Integer usuarioId,
                                 SolicitudHistorial.AccionEnum accion, String comentario) {
         SolicitudHistorial historial = SolicitudHistorial.crear(solicitud, usuarioId, accion, comentario);
