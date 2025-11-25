@@ -1141,9 +1141,10 @@ public class SolicitudService {
 
         List<SolicitudAdjunto> adjuntos = adjuntoRepository.findBySolicitudId(solicitudId);
         List<SolicitudHistorial> historial = historialRepository.findBySolicitudIdOrderByFechaAscWithUsuario(solicitudId.longValue());
+        List<SolicitudDestinatario> destinatarios = destinatarioRepository.findBySolicitudId(solicitudId);
 
         // Generar PDF de log en memoria
-        byte[] pdfLog = generarPdfLog(historial);
+        byte[] pdfLog = generarPdfLog(historial, destinatarios, solicitud);
 
         // Crear ZIP en memoria
         java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
@@ -1201,8 +1202,8 @@ public class SolicitudService {
         }
     }
 
-    // Genera PDF con tabla formateada (nombre/accion/fecha/descripcion)
-    private byte[] generarPdfLog(List<SolicitudHistorial> historial) throws Exception {
+    // Genera PDF con tabla formateada (nombre/accion/fecha/descripcion) y sección de destinatarios
+    private byte[] generarPdfLog(List<SolicitudHistorial> historial, List<SolicitudDestinatario> destinatarios, Solicitud solicitud) throws Exception {
         PDDocument doc = new PDDocument();
         PDPage page = new PDPage();
         doc.addPage(page);
@@ -1228,6 +1229,19 @@ public class SolicitudService {
         cs.setFont(fontBold, 16);
         cs.newLineAtOffset(margin, yStart);
         cs.showText("Log de Solicitud");
+        cs.endText();
+        yStart -= leading * 1.5f;
+
+        String subtitulo = String.format("ID: %d - Tipología: %s", 
+                solicitud.getId(),
+                solicitud.getTipologia() != null && solicitud.getTipologia().getDescripcion() != null 
+                        ? limpiarTexto(solicitud.getTipologia().getDescripcion()) 
+                        : "N/A");
+        
+        cs.beginText();
+        cs.setFont(font, 11);
+        cs.newLineAtOffset(margin, yStart);
+        cs.showText(subtitulo);
         cs.endText();
         yStart -= leading * 2;
 
@@ -1314,6 +1328,248 @@ public class SolicitudService {
                 
                 cs.endText();
                 yStart -= leading;
+            }
+        }
+
+        yStart -= leading * 2;
+
+        if (yStart < margin + 100) {
+            cs.endText();
+            cs.close();
+            page = new PDPage();
+            doc.addPage(page);
+            cs = new PDPageContentStream(doc, page);
+            yStart = page.getMediaBox().getHeight() - margin;
+        }
+
+        cs.beginText();
+        cs.setFont(fontBold, 14);
+        cs.newLineAtOffset(margin, yStart);
+        cs.showText("Destinatarios y Procesadores");
+        cs.endText();
+        yStart -= leading * 2;
+
+        List<SolicitudDestinatario> aprobadores = destinatarios.stream()
+                .filter(d -> !d.getEsProcesador())
+                .sorted(Comparator.comparing(SolicitudDestinatario::getOrdenIndex))
+                .collect(Collectors.toList());
+
+        List<SolicitudDestinatario> procesadores = destinatarios.stream()
+                .filter(SolicitudDestinatario::getEsProcesador)
+                .sorted(Comparator.comparing(SolicitudDestinatario::getOrdenIndex))
+                .collect(Collectors.toList());
+
+        if (!aprobadores.isEmpty()) {
+            cs.beginText();
+            cs.setFont(fontBold, 11);
+            cs.newLineAtOffset(margin, yStart);
+            cs.showText("Aprobadores:");
+            cs.endText();
+            yStart -= leading * 1.5f;
+
+            float anchoTipo = 80f;
+            float anchoUsuario = 120f;
+            float anchoOrden = 50f;
+            float anchoEstado = 80f;
+            float anchoFechaDest = 95f;
+            float anchoComentarioDest = anchoPagina - anchoTipo - anchoUsuario - anchoOrden - anchoEstado - anchoFechaDest;
+
+            cs.beginText();
+            cs.setFont(fontBold, 9);
+            cs.newLineAtOffset(margin, yStart);
+            cs.showText("Tipo");
+            cs.newLineAtOffset(anchoTipo, 0);
+            cs.showText("Usuario");
+            cs.newLineAtOffset(anchoUsuario, 0);
+            cs.showText("Orden");
+            cs.newLineAtOffset(anchoOrden, 0);
+            cs.showText("Estado");
+            cs.newLineAtOffset(anchoEstado, 0);
+            cs.showText("Fecha");
+            cs.newLineAtOffset(anchoFechaDest, 0);
+            cs.showText("Comentario");
+            cs.endText();
+            yStart -= leading;
+
+            cs.setLineWidth(0.5f);
+            cs.moveTo(margin, yStart);
+            cs.lineTo(margin + anchoPagina, yStart);
+            cs.stroke();
+            yStart -= leading * 0.5f;
+
+            cs.setFont(font, 8);
+            for (SolicitudDestinatario dest : aprobadores) {
+                if (yStart < margin + 50) {
+                    cs.endText();
+                    cs.close();
+                    page = new PDPage();
+                    doc.addPage(page);
+                    cs = new PDPageContentStream(doc, page);
+                    yStart = page.getMediaBox().getHeight() - margin;
+                    cs.setFont(font, 8);
+                }
+
+                Usuario usuario = usuarioRepository.findById(dest.getUsuarioId()).orElse(null);
+                String nombreUsuario = usuario != null ?
+                        limpiarTexto(Stream.of(usuario.getNombres(), usuario.getApellidos())
+                                .filter(Objects::nonNull)
+                                .map(String::trim)
+                                .filter(str -> !str.isEmpty())
+                                .collect(Collectors.joining(" "))) : "Usuario " + dest.getUsuarioId();
+
+                String tipo = "Aprobador";
+                String estado = dest.getDecision() != null ? dest.getDecision().name() : "PENDIENTE";
+                String fechaDest = dest.getFechaDecision() != null ? dest.getFechaDecision().format(fmt) : "";
+                String comentarioDest = dest.getComentario() != null ? limpiarTexto(dest.getComentario()) : "";
+
+                List<String> lineasComentario = dividirTextoEnLineas(comentarioDest, anchoComentarioDest, font, 8);
+                float alturaNecesaria = leading * lineasComentario.size();
+
+                if (yStart - alturaNecesaria < margin) {
+                    cs.endText();
+                    cs.close();
+                    page = new PDPage();
+                    doc.addPage(page);
+                    cs = new PDPageContentStream(doc, page);
+                    yStart = page.getMediaBox().getHeight() - margin;
+                    cs.setFont(font, 8);
+                }
+
+                for (int i = 0; i < lineasComentario.size(); i++) {
+                    cs.beginText();
+                    cs.newLineAtOffset(margin, yStart);
+
+                    if (i == 0) {
+                        cs.showText(truncarTexto(tipo, anchoTipo, font, 8));
+                        cs.newLineAtOffset(anchoTipo, 0);
+                        cs.showText(truncarTexto(nombreUsuario, anchoUsuario, font, 8));
+                        cs.newLineAtOffset(anchoUsuario, 0);
+                        cs.showText(String.valueOf(dest.getOrdenIndex()));
+                        cs.newLineAtOffset(anchoOrden, 0);
+                        cs.showText(truncarTexto(estado, anchoEstado, font, 8));
+                        cs.newLineAtOffset(anchoEstado, 0);
+                        cs.showText(truncarTexto(fechaDest, anchoFechaDest, font, 8));
+                        cs.newLineAtOffset(anchoFechaDest, 0);
+                    } else {
+                        cs.newLineAtOffset(anchoTipo + anchoUsuario + anchoOrden + anchoEstado + anchoFechaDest, 0);
+                    }
+
+                    cs.showText(lineasComentario.get(i));
+                    cs.endText();
+                    yStart -= leading;
+                }
+            }
+        }
+
+        if (!procesadores.isEmpty()) {
+            yStart -= leading;
+            if (yStart < margin + 100) {
+                cs.endText();
+                cs.close();
+                page = new PDPage();
+                doc.addPage(page);
+                cs = new PDPageContentStream(doc, page);
+                yStart = page.getMediaBox().getHeight() - margin;
+            }
+
+            cs.beginText();
+            cs.setFont(fontBold, 11);
+            cs.newLineAtOffset(margin, yStart);
+            cs.showText("Procesadores:");
+            cs.endText();
+            yStart -= leading * 1.5f;
+
+            float anchoTipo = 80f;
+            float anchoUsuario = 120f;
+            float anchoOrden = 50f;
+            float anchoEstado = 80f;
+            float anchoFechaDest = 95f;
+            float anchoComentarioDest = anchoPagina - anchoTipo - anchoUsuario - anchoOrden - anchoEstado - anchoFechaDest;
+
+            cs.beginText();
+            cs.setFont(fontBold, 9);
+            cs.newLineAtOffset(margin, yStart);
+            cs.showText("Tipo");
+            cs.newLineAtOffset(anchoTipo, 0);
+            cs.showText("Usuario");
+            cs.newLineAtOffset(anchoUsuario, 0);
+            cs.showText("Orden");
+            cs.newLineAtOffset(anchoOrden, 0);
+            cs.showText("Estado");
+            cs.newLineAtOffset(anchoEstado, 0);
+            cs.showText("Fecha");
+            cs.newLineAtOffset(anchoFechaDest, 0);
+            cs.showText("Comentario");
+            cs.endText();
+            yStart -= leading;
+
+            cs.setLineWidth(0.5f);
+            cs.moveTo(margin, yStart);
+            cs.lineTo(margin + anchoPagina, yStart);
+            cs.stroke();
+            yStart -= leading * 0.5f;
+
+            cs.setFont(font, 8);
+            for (SolicitudDestinatario dest : procesadores) {
+                if (yStart < margin + 50) {
+                    cs.endText();
+                    cs.close();
+                    page = new PDPage();
+                    doc.addPage(page);
+                    cs = new PDPageContentStream(doc, page);
+                    yStart = page.getMediaBox().getHeight() - margin;
+                    cs.setFont(font, 8);
+                }
+
+                Usuario usuario = usuarioRepository.findById(dest.getUsuarioId()).orElse(null);
+                String nombreUsuario = usuario != null ?
+                        limpiarTexto(Stream.of(usuario.getNombres(), usuario.getApellidos())
+                                .filter(Objects::nonNull)
+                                .map(String::trim)
+                                .filter(str -> !str.isEmpty())
+                                .collect(Collectors.joining(" "))) : "Usuario " + dest.getUsuarioId();
+
+                String tipo = "Procesador";
+                String estado = dest.getDecision() != null ? dest.getDecision().name() : "PENDIENTE";
+                String fechaDest = dest.getFechaDecision() != null ? dest.getFechaDecision().format(fmt) : "";
+                String comentarioDest = dest.getComentario() != null ? limpiarTexto(dest.getComentario()) : "";
+
+                List<String> lineasComentario = dividirTextoEnLineas(comentarioDest, anchoComentarioDest, font, 8);
+                float alturaNecesaria = leading * lineasComentario.size();
+
+                if (yStart - alturaNecesaria < margin) {
+                    cs.endText();
+                    cs.close();
+                    page = new PDPage();
+                    doc.addPage(page);
+                    cs = new PDPageContentStream(doc, page);
+                    yStart = page.getMediaBox().getHeight() - margin;
+                    cs.setFont(font, 8);
+                }
+
+                for (int i = 0; i < lineasComentario.size(); i++) {
+                    cs.beginText();
+                    cs.newLineAtOffset(margin, yStart);
+
+                    if (i == 0) {
+                        cs.showText(truncarTexto(tipo, anchoTipo, font, 8));
+                        cs.newLineAtOffset(anchoTipo, 0);
+                        cs.showText(truncarTexto(nombreUsuario, anchoUsuario, font, 8));
+                        cs.newLineAtOffset(anchoUsuario, 0);
+                        cs.showText(String.valueOf(dest.getOrdenIndex()));
+                        cs.newLineAtOffset(anchoOrden, 0);
+                        cs.showText(truncarTexto(estado, anchoEstado, font, 8));
+                        cs.newLineAtOffset(anchoEstado, 0);
+                        cs.showText(truncarTexto(fechaDest, anchoFechaDest, font, 8));
+                        cs.newLineAtOffset(anchoFechaDest, 0);
+                    } else {
+                        cs.newLineAtOffset(anchoTipo + anchoUsuario + anchoOrden + anchoEstado + anchoFechaDest, 0);
+                    }
+
+                    cs.showText(lineasComentario.get(i));
+                    cs.endText();
+                    yStart -= leading;
+                }
             }
         }
 
