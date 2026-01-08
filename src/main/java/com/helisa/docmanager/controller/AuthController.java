@@ -160,7 +160,7 @@ public class AuthController {
             
             // Establecer cargo enviado por el usuario
             CargoRepository cargoRepository = usuarioService.getCargoRepository();
-            Cargo cargoSeleccionado = cargoRepository.findById(20)
+            Cargo cargoSeleccionado = cargoRepository.findById(2)
                     .orElseThrow(() -> new RuntimeException("Cargo con ID " + request.getCargoId() + " no encontrado"));
             nuevoUsuario.setCargo(cargoSeleccionado);
 
