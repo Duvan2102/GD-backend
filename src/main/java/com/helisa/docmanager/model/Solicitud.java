@@ -49,7 +49,6 @@ public class Solicitud {
     @Column(name = "fecha_registro")
     private LocalDateTime fechaRegistro;
 
-    // ===== RELACIÓN CORRECTA CON ESTADO =====
     @NotNull
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "id_estado", nullable = false)
@@ -91,7 +90,6 @@ public class Solicitud {
     @OneToMany(mappedBy = "solicitud", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<SolicitudHistorial> historial;
 
-    // ===== CONSTANTES DE ESTADO =====
     public static final Integer ESTADO_PENDIENTE_ID = 1;
     public static final Integer ESTADO_APROBADO_ID = 2;
     public static final Integer ESTADO_RECHAZADO_ID = 3;
@@ -104,7 +102,6 @@ public class Solicitud {
     public static final String ESTADO_CANCELADO = "CANCELADA";
     public static final String ESTADO_APROBADO_PROCESO = "APROBADO PROCESO";
 
-    // ===== MÉTODOS DE UTILIDAD =====
     @PrePersist
     private void prePersist() {
         if (this.fechaRegistro == null) {

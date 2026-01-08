@@ -30,7 +30,6 @@ public class AreaService {
             throw new RuntimeException("El departamento especificado no existe");
         }
 
-        // Validar que no exista un área con descripción similar en el mismo departamento (ignorando acentos y mayúsculas)
         String descripcionNormalizada = StringUtils.normalizeForComparison(area.getDescripcion());
         List<Area> areasExistentes = areaRepository.findByDepartamento(departamento.get());
         
@@ -77,8 +76,7 @@ public class AreaService {
                         if (!departamento.isPresent()) {
                             throw new RuntimeException("El departamento especificado no existe");
                         }
-
-                        // Validar que no exista otra área con descripción similar en el mismo departamento (ignorando acentos y mayúsculas)
+    
                         if (!StringUtils.equalsNormalized(area.getDescripcion(), areaActualizada.getDescripcion()) ||
                                 !area.getDepartamento().getIdDepartamento().equals(areaActualizada.getDepartamento().getIdDepartamento())) {
 

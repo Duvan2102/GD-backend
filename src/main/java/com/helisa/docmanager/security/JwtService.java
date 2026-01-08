@@ -50,7 +50,7 @@ public class JwtService {
             DecodedJWT decoded = JWT.require(Algorithm.HMAC256(jwtSecret)).build().verify(token);
             return decoded.getExpiresAt().before(new Date());
         } catch (Exception e) {
-            return true; // Si no se puede verificar, consideramos que está expirado
+            return true;
         }
     }
 
@@ -64,9 +64,6 @@ public class JwtService {
         return decoded.getExpiresAt().toInstant();
     }
 
-    /**
-     * Genera un token temporal para validación de 2FA (válido por 5 minutos)
-     */
     public String generateTempToken(String username) {
         Instant now = Instant.now();
         Algorithm algorithm = Algorithm.HMAC256(jwtSecret);
@@ -79,9 +76,6 @@ public class JwtService {
                 .sign(algorithm);
     }
 
-    /**
-     * Valida si un token temporal es válido
-     */
     public boolean isTempTokenValid(String token) {
         try {
             DecodedJWT decoded = JWT.require(Algorithm.HMAC256(jwtSecret)).build().verify(token);
@@ -92,9 +86,6 @@ public class JwtService {
         }
     }
 
-    /**
-     * Extrae el username de un token temporal
-     */
     public String extractUsernameFromTempToken(String token) {
         try {
             DecodedJWT decoded = JWT.require(Algorithm.HMAC256(jwtSecret)).build().verify(token);

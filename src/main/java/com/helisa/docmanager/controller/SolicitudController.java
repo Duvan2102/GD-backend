@@ -134,10 +134,6 @@ public class SolicitudController {
         solicitudService.agregarProcesadores(id, request);
         return ResponseEntity.ok().build();
     }
-    /**
-     * Valida el código 2FA del usuario para confirmar una acción en la solicitud.
-     * Este endpoint NO modifica la solicitud, solo valida el código 2FA.
-     */
     @PostMapping("/{id}/validar-2fa")
     public ResponseEntity<?> validar2FA(
             @PathVariable Integer id,
@@ -148,11 +144,9 @@ public class SolicitudController {
                 id, request.getUsuarioId(), correlationId);
 
         try {
-            // Validar que el usuario existe
             Usuario usuario = usuarioRepository.findById(request.getUsuarioId())
                     .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
-            // Validar código 2FA según método configurado
             if (!twoFactorAuthService.validateTwoFactorCode(usuario, request.getCodigo2FA())) {
                 String metodo = (usuario.getTokenQr() != null && usuario.getTokenQr()) 
                         ? "Google Authenticator" 
@@ -245,7 +239,7 @@ public class SolicitudController {
     @GetMapping("/{id}/adjuntos/{adjuntoId}/download")
     public ResponseEntity<InputStreamResource> descargarAdjunto(
             @PathVariable Integer id,
-            @PathVariable Long adjuntoId,  // Long porque SolicitudAdjunto usa Long como ID
+            @PathVariable Long adjuntoId, 
             @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
 
         try {
@@ -338,7 +332,7 @@ public class SolicitudController {
 
     @GetMapping("/historico")
     public ResponseEntity<Page<SolicitudResumenResponse>> listarHistorico(
-            @RequestParam Integer usuarioId,  // Corregido a Integer
+            @RequestParam Integer usuarioId,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
             @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
 

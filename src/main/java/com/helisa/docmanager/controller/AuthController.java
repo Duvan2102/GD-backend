@@ -89,20 +89,14 @@ public class AuthController {
 
             loginAttemptService.recordSuccessfulLogin(request.getUsuario(), ipAddress);
 
-            // Si el usuario usa Google Auth pero no tiene configuración, generarla y marcarla como pendiente
             boolean usaGoogleAuth = usuario.getTokenQr() != null && usuario.getTokenQr();
             boolean noTieneConfiguracionGoogle = !twoFactorAuthService.hasAnyGoogleAuthToken(usuario.getUsuario());
             
             if (usaGoogleAuth && noTieneConfiguracionGoogle) {
-                // Configurar Google Auth y crear token pendiente
-                // El frontend consultará /2fa-status/{usuario} para detectar googleAuthPending = true
-                // y luego usará /get-google-auth-qr para obtener el QR
                 twoFactorAuthService.setupGoogleAuth(usuario);
                 twoFactorAuthService.createPendingGoogleAuthToken(usuario);
             }
 
-            // Siempre devolver TwoFactorRequiredResponse para mantener consistencia con el flujo existente
-            // El frontend consultará /2fa-status/{usuario} para determinar el siguiente paso
             String tempToken = jwtService.generateTempToken(userDetails.getUsername());
             return ResponseEntity.status(HttpStatus.ACCEPTED)
                     .body(new TwoFactorRequiredResponse("Se requiere código de verificación", 
@@ -124,26 +118,22 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
         try {
-            // Validar que el usuario no exista
             if (usuarioRepository.existsByUsuario(request.getUsuario())) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(new ErrorResponse("USUARIO_EXISTE", "El nombre de usuario ya existe"));
             }
 
-            // Validar que la identificación no exista
             if (usuarioRepository.existsByIdentificacion(request.getIdentificacion())) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(new ErrorResponse("IDENTIFICACION_EXISTE", "Ya existe un usuario con esta identificación"));
             }
 
-            // Validar que el correo no exista
             if (request.getCorreoEmpresarial() != null && 
                 usuarioRepository.findByCorreoEmpresarial(request.getCorreoEmpresarial()).isPresent()) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(new ErrorResponse("CORREO_EXISTE", "Ya existe un usuario con este correo empresarial"));
             }
 
-            // Crear nuevo usuario
             Usuario nuevoUsuario = new Usuario();
             nuevoUsuario.setIdentificacion(request.getIdentificacion());
             nuevoUsuario.setNombres(request.getNombres());
@@ -164,21 +154,17 @@ public class AuthController {
                     .orElseThrow(() -> new RuntimeException("Cargo con ID " + cargoId + " no encontrado"));
             nuevoUsuario.setCargo(cargoSeleccionado);
 
-            // Establecer vistas disponibles por defecto (si no se proporcionan en el request)
             if (request.getRol() != null && !request.getRol().isEmpty()) {
                 nuevoUsuario.setRol(request.getRol());
             } else {
-                // Vistas por defecto (puedes ajustar según tus necesidades)
                 nuevoUsuario.setRol(java.util.Arrays.asList(1, 2));
             }
 
-            // Establecer estado PENDIENTE
             EstadoRepository estadoRepository = usuarioService.getEstadoRepository();
             Estado estadoPendiente = estadoRepository.findByDescripcion("PENDIENTE")
                     .orElseThrow(() -> new RuntimeException("Estado PENDIENTE no encontrado en la base de datos"));
             nuevoUsuario.setEstado(estadoPendiente);
 
-            // Crear usuario usando el servicio
             Usuario usuarioCreado = usuarioService.crearUsuario(nuevoUsuario);
 
             return ResponseEntity.status(HttpStatus.CREATED)
@@ -246,7 +232,7 @@ public class AuthController {
     public static class LoginRequest {
         private String usuario;
         private String password;
-        private String codigo2FA; // Código de doble autenticación
+        private String codigo2FA;
     }
 
     @Data
@@ -362,7 +348,7 @@ public class AuthController {
         private final String message;
         private final String usuario;
         private final boolean requiere2FA;
-        private final String tempToken; // Token temporal para validar 2FA
+        private final String tempToken;
     }
 
     @Data
@@ -372,15 +358,9 @@ public class AuthController {
         private final String message;
     }
 
-    // ========== NUEVOS ENDPOINTS PARA DOBLE AUTENTICACIÓN ==========
-
-    /**
-     * Valida el código de doble autenticación y genera JWT final
-     */
     @PostMapping("/validate-2fa")
     public ResponseEntity<?> validateTwoFactor(@Valid @RequestBody Validate2FARequest request) {
         try {
-            // Validar token temporal
             if (!jwtService.isTempTokenValid(request.getTempToken())) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                         .body(new ErrorResponse("TOKEN_INVALIDO", "Token temporal inválido o expirado"));
@@ -390,11 +370,9 @@ public class AuthController {
             Usuario usuario = usuarioRepository.findByUsuario(username)
                     .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
-            // Verificar si necesita configurar Google Auth
             if (usuario.getTokenQr() != null && usuario.getTokenQr() &&
                 twoFactorAuthService.hasGoogleAuthConfigured(usuario.getUsuario()) && 
                 !twoFactorAuthService.isGoogleAuthConfirmed(usuario.getUsuario())) {
-                // El usuario tiene Google Auth configurado pero no confirmado
                 String existingSecret = twoFactorAuthService.getExistingGoogleAuthSecret(usuario.getUsuario());
                 String qrCodeUrl = twoFactorAuthService.generateQRCodeUrl(existingSecret, usuario.getUsuario(), "Helisa");
                 return ResponseEntity.status(HttpStatus.ACCEPTED)
@@ -402,14 +380,12 @@ public class AuthController {
                                 "Debes configurar Google Authenticator escaneando el código QR y luego confirma con un código"));
             }
 
-            // Validar código 2FA según método configurado
             if (!twoFactorAuthService.validateTwoFactorCode(usuario, request.getCodigo2FA())) {
                 String metodo = (usuario.getTokenQr() != null && usuario.getTokenQr()) ? "Google Authenticator" : "email";
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                         .body(new ErrorResponse("CODIGO_2FA_INVALIDO", "Código de " + metodo + " incorrecto"));
             }
 
-            // Generar JWT completo
             UserDetails userDetails = new org.springframework.security.core.userdetails.User(
                     usuario.getUsuario(), usuario.getPassword(), java.util.Collections.emptyList());
             String finalToken = jwtService.generateToken(userDetails);
@@ -422,9 +398,6 @@ public class AuthController {
         }
     }
 
-    /**
-     * Envía código de verificación por email
-     */
     @PostMapping("/send-email-code")
     public ResponseEntity<?> sendEmailCode(@Valid @RequestBody SendCodeRequest request) {
         try {
@@ -439,7 +412,6 @@ public class AuthController {
             twoFactorAuthService.sendEmailCode(usuario);
             return ResponseEntity.ok(new MessageResponse("Código enviado por email"));
         } catch (RuntimeException e) {
-            // Verificar si es el error de código ya existente
             if (e.getMessage().contains("Ya existe un código válido")) {
                 return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                         .body(new ErrorResponse("CODIGO_EXISTENTE", e.getMessage()));
@@ -456,16 +428,12 @@ public class AuthController {
         }
     }
 
-    /**
-     * Configura Google Authenticator para un usuario (PRIMERA VEZ)
-     */
     @PostMapping("/setup-google-auth")
     public ResponseEntity<?> setupGoogleAuth(@Valid @RequestBody SetupGoogleAuthRequest request) {
         try {
             Usuario usuario = usuarioRepository.findByUsuario(request.getUsuario())
                     .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
-            // Cambiar a método Google Auth
             usuario.setTokenQr(true);
             usuario.setTokenCorreo(false);
             usuarioRepository.save(usuario);
@@ -481,25 +449,19 @@ public class AuthController {
         }
     }
 
-    /**
-     * Confirma la configuración de Google Authenticator con un código
-     */
     @PostMapping("/confirm-google-auth")
     public ResponseEntity<?> confirmGoogleAuth(@Valid @RequestBody ConfirmGoogleAuthRequest request) {
         try {
             Usuario usuario = usuarioRepository.findByUsuario(request.getUsuario())
                     .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
-            // Validar el código de Google Authenticator
             if (!twoFactorAuthService.validateGoogleAuthCode(request.getSecret(), Integer.parseInt(request.getCodigo()))) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                         .body(new ErrorResponse("CODIGO_INVALIDO", "Código de Google Authenticator incorrecto"));
             }
 
-            // Eliminar token pendiente
             twoFactorAuthService.removePendingGoogleAuth(request.getUsuario());
             
-            // Verificar que usuario tiene Google Auth activo
             if (usuario.getTokenQr() == null || !usuario.getTokenQr()) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(new ErrorResponse("2FA_METHOD_INCORRECT", "Google Auth no está configurado como tu método activo"));
@@ -512,11 +474,6 @@ public class AuthController {
         }
     }
 
-    // Endpoint /disable-2fa eliminado - 2FA es obligatorio para todos los usuarios
-
-    /**
-     * Obtiene estadísticas de intentos de login
-     */
     @GetMapping("/login-stats/{usuario}")
     public ResponseEntity<?> getLoginStats(@PathVariable String usuario) {
         try {
@@ -528,9 +485,6 @@ public class AuthController {
         }
     }
 
-    /**
-     * Desbloquea un usuario manualmente
-     */
     @PostMapping("/unlock-user/{usuario}")
     public ResponseEntity<?> unlockUser(@PathVariable String usuario) {
         try {
@@ -542,9 +496,6 @@ public class AuthController {
         }
     }
 
-    /**
-     * Obtiene el estado de configuración de 2FA para un usuario
-     */
     @GetMapping("/2fa-status/{usuario}")
     @CrossOrigin(origins = "*")
     public ResponseEntity<?> get2FAStatus(@PathVariable String usuario) {
@@ -552,12 +503,10 @@ public class AuthController {
             Usuario user = usuarioRepository.findByUsuario(usuario)
                     .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
             
-            // Obtener configuración actual de 2FA
             boolean hasGoogleAuth = twoFactorAuthService.hasGoogleAuthConfigured(usuario);
             boolean isGoogleAuthConfirmed = twoFactorAuthService.isGoogleAuthConfirmed(usuario);
             boolean tokenCorreo = user.getTokenCorreo() != null && user.getTokenCorreo();
             
-            // Si tiene Google Auth configurado pero no confirmado, considerarlo como configurado
             boolean googleAuthConfigured = hasGoogleAuth && isGoogleAuthConfirmed;
             boolean googleAuthPending = hasGoogleAuth && !isGoogleAuthConfirmed;
             
@@ -573,24 +522,18 @@ public class AuthController {
         }
     }
 
-    /**
-     * Obtiene o regenera el código QR para Google Authenticator
-     */
     @PostMapping("/get-google-auth-qr")
     public ResponseEntity<?> getGoogleAuthQR(@Valid @RequestBody SetupGoogleAuthRequest request) {
         try {
             Usuario usuario = usuarioRepository.findByUsuario(request.getUsuario())
                     .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
-            // Verificar si ya tiene Google Auth configurado
             if (twoFactorAuthService.hasGoogleAuthConfigured(request.getUsuario())) {
-                // Si ya tiene configurado, devolver el QR existente
                 String existingSecret = twoFactorAuthService.getExistingGoogleAuthSecret(request.getUsuario());
                 String qrCodeUrl = twoFactorAuthService.generateQRCodeUrl(existingSecret, request.getUsuario(), "Helisa");
                 return ResponseEntity.ok(new TwoFactorSetupResponse(qrCodeUrl, existingSecret, 
                         "Código QR existente para Google Authenticator"));
             } else {
-                // Si no tiene configurado, generar uno nuevo
                 TwoFactorAuthService.TwoFactorSetupResult result = twoFactorAuthService.setupGoogleAuth(usuario);
                 twoFactorAuthService.createPendingGoogleAuthToken(usuario);
                 return ResponseEntity.ok(new TwoFactorSetupResponse(result.getQrCodeUrl(), result.getSecret(), 
@@ -602,9 +545,6 @@ public class AuthController {
         }
     }
 
-    /**
-     * Desvincula Google Authenticator del usuario
-     */
     @PostMapping("/remove-google-auth")
     public ResponseEntity<?> removeGoogleAuth(@Valid @RequestBody RemoveGoogleAuthRequest request) {
         try {
@@ -616,11 +556,8 @@ public class AuthController {
                         .body(new ErrorResponse("PASSWORD_INCORRECT", "Contraseña incorrecta"));
             }
             
-            // Eliminar Google Auth actual
             twoFactorAuthService.removeGoogleAuth(request.getUsuario());
             
-            // Si el usuario tiene 2FA habilitado, generar nuevo setup para que pueda reconfigurar
-            // 2FA es obligatorio - siempre generar nuevo setup para Google Auth
             twoFactorAuthService.setupGoogleAuth(usuario);
             twoFactorAuthService.createPendingGoogleAuthToken(usuario);
             return ResponseEntity.ok(new MessageResponse("Google Authenticator desvinculado. Debes configurar Google Authenticator nuevamente en tu próximo inicio de sesión."));
@@ -630,20 +567,14 @@ public class AuthController {
         }
     }
 
-    /**
-     * Limpia el estado de 2FA de un usuario (para corregir inconsistencias)
-     */
     @PostMapping("/reset-2fa-state/{usuario}")
     public ResponseEntity<?> reset2FAState(@PathVariable String usuario) {
         try {
             Usuario user = usuarioRepository.findByUsuario(usuario)
                     .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
-            // Limpiar todos los tokens de 2FA
             twoFactorAuthService.removeGoogleAuth(usuario);
             
-            // Si el usuario tenía 2FA habilitado, generar nuevo setup para Google Auth
-            // 2FA es obligatorio - siempre generar nuevo setup para Google Auth
             twoFactorAuthService.setupGoogleAuth(user);
             twoFactorAuthService.createPendingGoogleAuthToken(user);
             return ResponseEntity.ok(new MessageResponse("Estado de 2FA limpiado. El usuario debe configurar Google Authenticator en su próximo inicio de sesión."));
@@ -653,34 +584,24 @@ public class AuthController {
         }
     }
 
-    /**
-     * Cambia el método de autenticación 2FA del usuario
-     */
     @PostMapping("/change-2fa-method")
     public ResponseEntity<?> change2FAMethod(@Valid @RequestBody Change2FAMethodRequest request) {
         try {
-            // Buscar usuario por ID
             Usuario usuario = usuarioRepository.findById(request.getIdUsuario())
                     .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
-            // 2FA es obligatorio para todos los usuarios - no necesita verificación
-
             String nuevoMetodo = request.getNuevoMetodo().toUpperCase();
             
-            // Validar que el método sea válido
             if (!"EMAIL".equals(nuevoMetodo) && !"GOOGLE_AUTH".equals(nuevoMetodo)) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(new ErrorResponse("METODO_INVALIDO", "El método debe ser 'EMAIL' o 'GOOGLE_AUTH'"));
             }
 
-            // Cambiar el método según la solicitud
             if ("EMAIL".equals(nuevoMetodo)) {
-                // Cambiar a método Email
                 usuario.setTokenCorreo(true);
                 usuario.setTokenQr(false);
                 usuarioRepository.save(usuario);
                 
-                // Eliminar Google Auth si existe
                 if (twoFactorAuthService.hasGoogleAuthConfigured(usuario.getUsuario())) {
                     twoFactorAuthService.removeGoogleAuth(usuario.getUsuario());
                 }
@@ -688,12 +609,10 @@ public class AuthController {
                 return ResponseEntity.ok(new MessageResponse("Método de autenticación cambiado a EMAIL exitosamente"));
                 
             } else if ("GOOGLE_AUTH".equals(nuevoMetodo)) {
-                // Cambiar a método Google Auth
                 usuario.setTokenQr(true);
                 usuario.setTokenCorreo(false);
                 usuarioRepository.save(usuario);
                 
-                // Generar nueva configuración para Google Auth
                 twoFactorAuthService.setupGoogleAuth(usuario);
                 twoFactorAuthService.createPendingGoogleAuthToken(usuario);
                 

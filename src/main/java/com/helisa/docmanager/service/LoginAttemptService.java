@@ -18,10 +18,8 @@ public class LoginAttemptService {
     @Autowired
     private EmailService emailService;
 
-    // Cache en memoria para intentos de login
     private final ConcurrentMap<String, LoginAttempt> loginAttempts = new ConcurrentHashMap<>();
     
-    // Configuración de límites
     private static final int MAX_ATTEMPTS = 5;
     private static final int LOCKOUT_DURATION_MINUTES = 30;
     private static final int MAX_ATTEMPTS_PER_HOUR = 10;
@@ -65,15 +63,11 @@ public class LoginAttemptService {
                    firstAttempt.isAfter(LocalDateTime.now().minusHours(1));
         }
 
-        // Getters
         public int getAttempts() { return attempts; }
         public LocalDateTime getFirstAttempt() { return firstAttempt; }
         public LocalDateTime getLastAttempt() { return lastAttempt; }
     }
 
-    /**
-     * Registra un intento de login exitoso
-     */
     public void recordSuccessfulLogin(String username, String ipAddress) {
         LoginAttempt attempt = loginAttempts.get(username);
         if (attempt != null) {
@@ -82,9 +76,6 @@ public class LoginAttemptService {
         System.out.println("Login exitoso para usuario: " + username + " desde IP: " + ipAddress);
     }
 
-    /**
-     * Registra un intento de login fallido
-     */
     public void recordFailedLogin(String username, String ipAddress) {
         LoginAttempt attempt = loginAttempts.computeIfAbsent(username, k -> new LoginAttempt());
         attempt.recordAttempt();
@@ -93,15 +84,11 @@ public class LoginAttemptService {
                           " desde IP: " + ipAddress + 
                           " (Intento #" + attempt.getAttempts() + ")");
         
-        // Si se excede el límite, enviar alerta por email
         if (attempt.getAttempts() == MAX_ATTEMPTS) {
             sendLoginAlert(username, ipAddress);
         }
     }
 
-    /**
-     * Verifica si el usuario está bloqueado
-     */
     public boolean isUserLocked(String username) {
         LoginAttempt attempt = loginAttempts.get(username);
         if (attempt == null) {
@@ -110,9 +97,6 @@ public class LoginAttemptService {
         return attempt.isLocked();
     }
 
-    /**
-     * Verifica si el usuario ha excedido el límite de intentos por hora
-     */
     public boolean hasExceededHourlyLimit(String username) {
         LoginAttempt attempt = loginAttempts.get(username);
         if (attempt == null) {
@@ -121,9 +105,6 @@ public class LoginAttemptService {
         return attempt.hasExceededHourlyLimit();
     }
 
-    /**
-     * Obtiene el número de intentos restantes
-     */
     public int getRemainingAttempts(String username) {
         LoginAttempt attempt = loginAttempts.get(username);
         if (attempt == null) {
@@ -132,9 +113,6 @@ public class LoginAttemptService {
         return Math.max(0, MAX_ATTEMPTS - attempt.getAttempts());
     }
 
-    /**
-     * Obtiene el tiempo de desbloqueo restante en minutos
-     */
     public long getLockoutTimeRemaining(String username) {
         LoginAttempt attempt = loginAttempts.get(username);
         if (attempt == null || !attempt.isLocked()) {
@@ -151,9 +129,6 @@ public class LoginAttemptService {
         return java.time.Duration.between(now, unlockTime).toMinutes();
     }
 
-    /**
-     * Envía alerta de intentos de login sospechosos
-     */
     private void sendLoginAlert(String username, String ipAddress) {
         try {
             Usuario usuario = usuarioRepository.findByUsuario(username).orElse(null);
@@ -172,18 +147,12 @@ public class LoginAttemptService {
         }
     }
 
-    /**
-     * Limpia intentos antiguos (método de mantenimiento)
-     */
     public void cleanOldAttempts() {
         LocalDateTime cutoff = LocalDateTime.now().minusHours(2);
         loginAttempts.entrySet().removeIf(entry -> 
             entry.getValue().getLastAttempt().isBefore(cutoff) && !entry.getValue().isLocked());
     }
 
-    /**
-     * Desbloquea manualmente un usuario
-     */
     public void unlockUser(String username) {
         LoginAttempt attempt = loginAttempts.get(username);
         if (attempt != null) {
@@ -192,9 +161,6 @@ public class LoginAttemptService {
         }
     }
 
-    /**
-     * Obtiene estadísticas de intentos para un usuario
-     */
     public String getAttemptStats(String username) {
         LoginAttempt attempt = loginAttempts.get(username);
         if (attempt == null) {

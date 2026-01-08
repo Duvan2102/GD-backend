@@ -35,7 +35,6 @@ public class Usuario {
     @Column(unique = true)
     private String usuario;
 
-    @NotNull
     @ManyToOne
     @JoinColumn(name = "id_cargo")
     private Cargo cargo;

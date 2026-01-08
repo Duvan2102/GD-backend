@@ -19,7 +19,6 @@ public class AreaController {
     @Autowired
     private AreaService areaService;
 
-    // Crear una nueva área
     @PostMapping
     public ResponseEntity<?> crearArea(@Valid @RequestBody Area area) {
         try {
@@ -30,14 +29,12 @@ public class AreaController {
         }
     }
 
-    // Obtener todas las áreas
     @GetMapping
     public ResponseEntity<List<Area>> obtenerTodasAreas() {
         List<Area> areas = areaService.obtenerTodasAreas();
         return new ResponseEntity<>(areas, HttpStatus.OK);
     }
 
-    // Obtener área por ID
     @GetMapping("/{id}")
     public ResponseEntity<?> obtenerAreaPorId(@PathVariable Integer id) {
         Optional<Area> area = areaService.obtenerAreaPorId(id);
@@ -48,7 +45,6 @@ public class AreaController {
         }
     }
 
-    // Buscar áreas por descripción
     @GetMapping("/buscar")
     public ResponseEntity<List<Area>> buscarAreasPorDescripcion(
             @RequestParam String descripcion) {
@@ -56,7 +52,6 @@ public class AreaController {
         return new ResponseEntity<>(areas, HttpStatus.OK);
     }
 
-    // Obtener área por descripción exacta
     @GetMapping("/descripcion/{descripcion}")
     public ResponseEntity<?> obtenerAreaPorDescripcion(@PathVariable String descripcion) {
         Optional<Area> area = areaService.obtenerAreaPorDescripcion(descripcion);
@@ -67,14 +62,12 @@ public class AreaController {
         }
     }
 
-    // Obtener áreas por departamento
     @GetMapping("/departamento/{idDepartamento}")
     public ResponseEntity<List<Area>> obtenerAreasPorDepartamento(@PathVariable Integer idDepartamento) {
         List<Area> areas = areaService.obtenerAreasPorDepartamento(idDepartamento);
         return new ResponseEntity<>(areas, HttpStatus.OK);
     }
 
-    // Actualizar área
     @PutMapping("/{id}")
     public ResponseEntity<?> actualizarArea(
             @PathVariable Integer id,
@@ -87,7 +80,6 @@ public class AreaController {
         }
     }
 
-    // Eliminar área
     @DeleteMapping("/{id}")
     public ResponseEntity<?> eliminarArea(@PathVariable Integer id) {
         try {
@@ -98,14 +90,12 @@ public class AreaController {
         }
     }
 
-    // Verificar si existe un área
     @GetMapping("/{id}/existe")
     public ResponseEntity<Boolean> existeArea(@PathVariable Integer id) {
         boolean existe = areaService.existeArea(id);
         return new ResponseEntity<>(existe, HttpStatus.OK);
     }
 
-    // Contar áreas por departamento
     @GetMapping("/departamento/{idDepartamento}/contar")
     public ResponseEntity<Long> contarAreasPorDepartamento(@PathVariable Integer idDepartamento) {
         long cantidad = areaService.contarAreasPorDepartamento(idDepartamento);

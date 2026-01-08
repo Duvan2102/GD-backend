@@ -16,7 +16,6 @@ public class DepartamentoService {
     private DepartamentoRepository departamentoRepository;
 
     public Departamento crearDepartamento(Departamento departamento) {
-        // Validar que no exista un departamento con descripción similar (ignorando acentos y mayúsculas)
         String descripcionNormalizada = StringUtils.normalizeForComparison(departamento.getDescripcion());
         List<Departamento> departamentos = departamentoRepository.findAll();
         
@@ -49,7 +48,6 @@ public class DepartamentoService {
     public Departamento actualizarDepartamento(Integer id, Departamento departamentoActualizado) {
         return departamentoRepository.findById(id)
                 .map(departamento -> {
-                    // Validar que no exista otro departamento con descripción similar (ignorando acentos y mayúsculas)
                     if (!StringUtils.equalsNormalized(departamento.getDescripcion(), departamentoActualizado.getDescripcion())) {
                         String descripcionNormalizada = StringUtils.normalizeForComparison(departamentoActualizado.getDescripcion());
                         List<Departamento> departamentos = departamentoRepository.findAll();

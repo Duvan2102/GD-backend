@@ -29,10 +29,6 @@ public class AuditController {
     @Autowired
     private AuditService auditService;
 
-    /**
-     * Busca solicitudes con filtros de auditoría
-     * POST /api/auditoria/buscar
-     */
     @PostMapping("/buscar")
     public ResponseEntity<Page<AuditSolicitudResponse>> buscarSolicitudes(
             @Valid @RequestBody AuditSearchRequest request,
@@ -50,10 +46,6 @@ public class AuditController {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Genera Excel de auditoría para las solicitudes seleccionadas
-     * POST /api/auditoria/excel
-     */
     @PostMapping("/excel")
     public ResponseEntity<Resource> generarExcelAuditoria(
             @Valid @RequestBody AuditExcelRequest request,
@@ -65,7 +57,6 @@ public class AuditController {
         try {
             byte[] excelBytes = auditService.generarExcelAuditoria(request);
             
-            // Generar nombre de archivo con timestamp
             String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
             String filename = "auditoria_solicitudes_" + timestamp + ".xlsx";
 

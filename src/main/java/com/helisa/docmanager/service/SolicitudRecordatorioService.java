@@ -34,13 +34,11 @@ public class SolicitudRecordatorioService {
     @Autowired
     private EmailService emailService;
 
-    // Ejecutar todos los días a las 12:00 del medio día hora de Bogotá
     @Scheduled(cron = "0 0 12 * * *", zone = "America/Bogota")
     public void procesarRecordatoriosDiarios() {
-        // Verificación adicional de franja horaria (7:00 a 19:00)
         LocalTime ahoraBogota = LocalTime.now(ZONA_BOGOTA);
         if (ahoraBogota.isBefore(LocalTime.of(7, 0)) || ahoraBogota.isAfter(LocalTime.of(19, 0))) {
-            return; // fuera de franja horaria
+            return;
         }
 
         List<Solicitud> pendientesPrimeraRonda = solicitudRepository

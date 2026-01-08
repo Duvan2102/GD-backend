@@ -18,7 +18,6 @@ public interface SolicitudAdjuntoRepository extends JpaRepository<SolicitudAdjun
     @Query("SELECT COUNT(a) FROM SolicitudAdjunto a WHERE a.solicitud.id = :solicitudId")
     Long countBySolicitudId(@Param("solicitudId") Integer solicitudId);
 
-    // Verificar que el adjunto pertenece a la solicitud
     @Query("SELECT a FROM SolicitudAdjunto a WHERE a.id = :adjuntoId AND a.solicitud.id = :solicitudId")
     Optional<SolicitudAdjunto> findByIdAndSolicitudId(
             @Param("adjuntoId") Long adjuntoId,

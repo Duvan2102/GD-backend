@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
-@Data // ✅ AGREGAR LOMBOK
+@Data
 @Entity
 @Table(name = "comentarios")
 public class Comentario {

@@ -20,10 +20,7 @@ public class TokenCleanupService {
     @Autowired
     private RevokedTokenRepository revokedTokenRepository;
 
-    /**
-     * Limpia tokens expirados cada 10 minutos
-     */
-    @Scheduled(fixedRate = 600000) // 10 minutos
+    @Scheduled(fixedRate = 600000)
     @Transactional
     public void cleanupExpiredTokens() {
         try {
@@ -37,15 +34,10 @@ public class TokenCleanupService {
         }
     }
 
-    /**
-     * Limpia tokens revocados expirados cada hora
-     * Elimina los tokens revocados que ya expiraron hace más de 1 día
-     */
-    @Scheduled(fixedRate = 3600000) // 1 hora
+    @Scheduled(fixedRate = 3600000)
     @Transactional
     public void cleanupRevokedTokens() {
         try {
-            // Eliminar tokens revocados que expiraron hace más de 1 día
             LocalDateTime cutoffDate = LocalDateTime.now().minusDays(1);
             long deletedCount = revokedTokenRepository.deleteByExpiresAtBefore(cutoffDate);
             if (deletedCount > 0) {

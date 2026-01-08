@@ -26,80 +26,54 @@ public class TwoFactorAuthService {
     private final GoogleAuthenticator googleAuthenticator = new GoogleAuthenticator();
     private final Random random = new Random();
 
-    // Constantes para tipos de validación
     public static final String TIPO_GOOGLE_AUTH = "GOOGLE_AUTH";
     public static final String TIPO_EMAIL_CODE = "EMAIL_CODE";
     public static final String TIPO_GOOGLE_AUTH_SECRET = "GOOGLE_AUTH_SECRET";
     public static final String TIPO_GOOGLE_AUTH_PENDING = "GOOGLE_AUTH_PENDING";
 
-    // Configuración desde properties
     @Value("${app.2fa.email-code.validity-minutes:5}")
     private int emailCodeValidityMinutes;
     
     @Value("${app.2fa.max-attempts-per-hour:5}")
     private int maxAttemptsPerHour;
 
-    /**
-     * Genera un código de 6 dígitos para envío por email
-     */
     public String generateEmailCode() {
         return String.format("%06d", random.nextInt(1000000));
     }
 
-    /**
-     * Genera un secreto para Google Authenticator
-     */
     public String generateGoogleAuthSecret() {
         GoogleAuthenticatorKey key = googleAuthenticator.createCredentials();
         return key.getKey();
     }
 
-    /**
-     * Genera la URL QR para Google Authenticator
-     */
     public String generateQRCodeUrl(String secret, String usuario, String issuer) {
-        // Generar URL manualmente para evitar problemas de compatibilidad
         return String.format("otpauth://totp/%s:%s?secret=%s&issuer=%s", 
                            issuer, usuario, secret, issuer);
     }
 
-    /**
-     * Valida un código de Google Authenticator
-     */
     public boolean validateGoogleAuthCode(String secret, int code) {
         return googleAuthenticator.authorize(secret, code);
     }
 
-    /**
-     * Valida un código de email
-     * - Solo valida el código más reciente del usuario
-     * - Elimina el código después de validarlo exitosamente
-     * - No permite reutilizar el mismo código
-     */
     @Transactional
     public boolean validateEmailCode(String codigo, Usuario usuario) {
         LocalDateTime now = LocalDateTime.now();
         
-        // Buscar el token por código, usuario y tipo - CRÍTICO: debe filtrar por usuario desde el inicio
         var tokenOpt = tokenRepository.findValidTokenByCodigoUsuarioAndTipo(codigo, usuario, TIPO_EMAIL_CODE, now);
         
         if (tokenOpt.isEmpty()) {
-            return false; // Código no encontrado, no pertenece al usuario o expirado
+            return false;
         }
         
         Token token = tokenOpt.get();
         
-        // Verificar que es el código más reciente del usuario
-        // (prevenir uso de códigos antiguos que aún no han expirado)
         var tokensUsuario = tokenRepository.findValidTokensByUsuarioAndTipoOrderByFechaExpDesc(
             usuario, TIPO_EMAIL_CODE, now);
         
         if (!tokensUsuario.isEmpty() && !tokensUsuario.get(0).getIdToken().equals(token.getIdToken())) {
-            // Existe un código más reciente, este ya no es válido
             return false;
         }
         
-        // Código válido - eliminarlo inmediatamente para prevenir reutilización
         tokenRepository.delete(token);
         
         return true;
@@ -114,31 +88,25 @@ public class TwoFactorAuthService {
 
         LocalDateTime now = LocalDateTime.now();
         
-        // Verificar si existe un código válido (no expirado)
         List<Token> tokensPrevios = tokenRepository.findValidTokensByUsuarioAndTipoOrderByFechaExpDesc(
             usuario, TIPO_EMAIL_CODE, now);
         
         if (!tokensPrevios.isEmpty()) {
-            // Hay un código válido que aún no ha expirado
             Token tokenActual = tokensPrevios.get(0);
             long minutosRestantes = java.time.Duration.between(now, tokenActual.getFechaExp()).toMinutes();
             throw new RuntimeException("Ya existe un código válido enviado. Expira en " + minutosRestantes + " minuto(s). Usa ese código o espera a que expire.");
         }
 
-        // No hay códigos válidos, generar uno nuevo
         String codigo = generateEmailCode();
         
-        // Crear token con tiempo de vida configurable
         Token token = new Token();
         token.setUsuario(usuario);
         token.setCodigo(codigo);
         token.setTipoValidacion(TIPO_EMAIL_CODE);
         token.setFechaExp(LocalDateTime.now().plusMinutes(emailCodeValidityMinutes));
         
-        // Guardar token
         token = tokenRepository.save(token);
         
-        // Enviar email
         String email = usuario.getCorreoEmpresarial() != null ? 
                       usuario.getCorreoEmpresarial() : usuario.getCorreoPersonal();
         
@@ -151,11 +119,7 @@ public class TwoFactorAuthService {
         return token;
     }
 
-    /**
-     * Configura Google Authenticator para un usuario (sin crear token pendiente)
-     */
     public TwoFactorSetupResult setupGoogleAuth(Usuario usuario) {
-        // Verificar si ya tiene un secreto configurado
         LocalDateTime now = LocalDateTime.now();
         var existingSecret = tokenRepository.findValidTokenByUsuarioAndTipo(usuario, TIPO_GOOGLE_AUTH_SECRET, now);
         
@@ -163,15 +127,13 @@ public class TwoFactorAuthService {
         if (existingSecret.isPresent()) {
             secret = existingSecret.get().getCodigo();
         } else {
-            // Generar nuevo secreto
             secret = generateGoogleAuthSecret();
             
-            // Crear token con el secreto
             Token token = new Token();
             token.setUsuario(usuario);
             token.setCodigo(secret);
             token.setTipoValidacion(TIPO_GOOGLE_AUTH_SECRET);
-            token.setFechaExp(LocalDateTime.now().plusYears(10)); // El secreto no expira
+            token.setFechaExp(LocalDateTime.now().plusYears(10));
             
             tokenRepository.save(token);
         }
@@ -180,31 +142,23 @@ public class TwoFactorAuthService {
         return new TwoFactorSetupResult(qrCodeUrl, secret);
     }
 
-    /**
-     * Crea un token pendiente para Google Authenticator
-     */
     public void createPendingGoogleAuthToken(Usuario usuario) {
-        // Verificar si ya existe un token pendiente
         LocalDateTime now = LocalDateTime.now();
         var existingPending = tokenRepository.findValidTokenByUsuarioAndTipo(usuario, TIPO_GOOGLE_AUTH_PENDING, now);
         
         if (existingPending.isPresent()) {
-            return; // Ya existe un token pendiente
+            return;
         }
         
-        // Crear token pendiente para indicar que necesita confirmación
         Token pendingToken = new Token();
         pendingToken.setUsuario(usuario);
         pendingToken.setCodigo("PENDING");
         pendingToken.setTipoValidacion(TIPO_GOOGLE_AUTH_PENDING);
-        pendingToken.setFechaExp(LocalDateTime.now().plusDays(7)); // Válido por 7 días
+        pendingToken.setFechaExp(LocalDateTime.now().plusDays(7));
         
         tokenRepository.save(pendingToken);
     }
 
-    /**
-     * Clase para devolver el resultado del setup
-     */
     public static class TwoFactorSetupResult {
         private final String qrCodeUrl;
         private final String secret;
@@ -218,30 +172,20 @@ public class TwoFactorAuthService {
         public String getSecret() { return secret; }
     }
 
-    /**
-     * Valida el código de doble autenticación según el método configurado en el usuario
-     */
     public boolean validateTwoFactorCode(Usuario usuario, String codigo) {
-        // Verificar límite de intentos
         if (hasExceededAttemptLimit(usuario, TIPO_EMAIL_CODE)) {
             throw new RuntimeException("Has excedido el límite de intentos. Intenta más tarde.");
         }
 
-        // Determinar método de autenticación según configuración del usuario
         if (usuario.getTokenQr() != null && usuario.getTokenQr()) {
-            // Usuario usa Google Authenticator
             return validarCodigoGoogleAuth(usuario, codigo);
         } else if (usuario.getTokenCorreo() != null && usuario.getTokenCorreo()) {
-            // Usuario usa código de email
             return validarCodigoEmail(usuario, codigo);
         } else {
             throw new RuntimeException("Usuario no tiene método de 2FA configurado");
         }
     }
 
-    /**
-     * Valida específicamente un código de Google Authenticator
-     */
     public boolean validarCodigoGoogleAuth(Usuario usuario, String codigo) {
         LocalDateTime now = LocalDateTime.now();
         var googleSecret = tokenRepository.findValidTokenByUsuarioAndTipo(usuario, TIPO_GOOGLE_AUTH_SECRET, now);
@@ -258,9 +202,6 @@ public class TwoFactorAuthService {
         }
     }
 
-    /**
-     * Valida específicamente un código de email
-     */
     public boolean validarCodigoEmail(Usuario usuario, String codigo) {
         return validateEmailCode(codigo, usuario);
     }
@@ -271,39 +212,24 @@ public class TwoFactorAuthService {
         return attempts >= maxAttemptsPerHour;
     }
 
-    /**
-     * Limpia tokens expirados
-     */
     public void cleanExpiredTokens() {
         tokenRepository.deleteExpiredTokens(LocalDateTime.now());
     }
 
-    /**
-     * Deshabilita la doble autenticación para un usuario
-     */
     public void disableTwoFactorAuth(Usuario usuario) {
-        // Eliminar todos los tokens de 2FA del usuario
         var tokens = tokenRepository.findByUsuarioOrderByFechaExpDesc(usuario);
         tokens.stream()
                 .filter(token -> TIPO_GOOGLE_AUTH_SECRET.equals(token.getTipoValidacion()) || 
                                 TIPO_EMAIL_CODE.equals(token.getTipoValidacion()))
                 .forEach(tokenRepository::delete);
         
-        // Actualizar el usuario
-        // Este método ya no se usa - 2FA es obligatorio\n        throw new RuntimeException(\"La doble autenticación es obligatoria y no se puede deshabilitar\");
     }
 
-    /**
-     * Verifica si un usuario tiene Google Authenticator configurado
-     */
     public boolean hasGoogleAuthConfigured(String usuario) {
         LocalDateTime now = LocalDateTime.now();
         return tokenRepository.findValidTokenByUsuarioAndTipo(usuario, TIPO_GOOGLE_AUTH_SECRET, now).isPresent();
     }
 
-    /**
-     * Verifica si un usuario tiene algún token de Google Auth (secreto o pendiente)
-     */
     public boolean hasAnyGoogleAuthToken(String usuario) {
         LocalDateTime now = LocalDateTime.now();
         boolean hasSecret = tokenRepository.findValidTokenByUsuarioAndTipo(usuario, TIPO_GOOGLE_AUTH_SECRET, now).isPresent();
@@ -311,9 +237,6 @@ public class TwoFactorAuthService {
         return hasSecret || hasPending;
     }
 
-    /**
-     * Obtiene el secreto existente de Google Authenticator para un usuario
-     */
     public String getExistingGoogleAuthSecret(String usuario) {
         LocalDateTime now = LocalDateTime.now();
         return tokenRepository.findValidTokenByUsuarioAndTipo(usuario, TIPO_GOOGLE_AUTH_SECRET, now)
@@ -321,35 +244,24 @@ public class TwoFactorAuthService {
                 .orElse(null);
     }
 
-    /**
-     * Elimina la configuración de Google Authenticator de un usuario
-     */
     public void removeGoogleAuth(String usuario) {
         tokenRepository.deleteByUsuarioAndTipo(usuario, TIPO_GOOGLE_AUTH_SECRET);
         tokenRepository.deleteByUsuarioAndTipo(usuario, TIPO_GOOGLE_AUTH_PENDING);
     }
 
-    /**
-     * Elimina solo el token pendiente de Google Authenticator
-     */
     public void removePendingGoogleAuth(String usuario) {
         tokenRepository.deleteByUsuarioAndTipo(usuario, TIPO_GOOGLE_AUTH_PENDING);
     }
 
-    /**
-     * Verifica si un usuario tiene Google Authenticator configurado y confirmado
-     */
     public boolean isGoogleAuthConfirmed(String usuario) {
         LocalDateTime now = LocalDateTime.now();
         var googleSecret = tokenRepository.findValidTokenByUsuarioAndTipo(usuario, TIPO_GOOGLE_AUTH_SECRET, now);
         var pendingToken = tokenRepository.findValidTokenByUsuarioAndTipo(usuario, TIPO_GOOGLE_AUTH_PENDING, now);
         
-        // Si tiene secreto pero también tiene token pendiente, no está confirmado
         if (googleSecret.isPresent() && pendingToken.isPresent()) {
             return false;
         }
         
-        // Si tiene secreto y no tiene token pendiente, está confirmado
         if (googleSecret.isPresent() && !pendingToken.isPresent()) {
             return true;
         }
@@ -357,26 +269,18 @@ public class TwoFactorAuthService {
         return false;
     }
 
-    /**
-     * Activa el método de autenticación por Email y desactiva Google Auth
-     */
     public void activarMetodoEmail(Usuario usuario) {
         usuario.setTokenCorreo(true);
         usuario.setTokenQr(false);
         
-        // Eliminar tokens de Google Auth si existen
         tokenRepository.deleteByUsuarioAndTipo(usuario.getUsuario(), TIPO_GOOGLE_AUTH_SECRET);
         tokenRepository.deleteByUsuarioAndTipo(usuario.getUsuario(), TIPO_GOOGLE_AUTH_PENDING);
     }
 
-    /**
-     * Activa el método de autenticación por Google Auth y desactiva Email
-     */
     public void activarMetodoGoogleAuth(Usuario usuario) {
         usuario.setTokenQr(true);
         usuario.setTokenCorreo(false);
         
-        // Limpiar tokens de email si existen
         var tokensEmail = tokenRepository.findValidTokensByUsuarioAndTipoOrderByFechaExpDesc(
             usuario, TIPO_EMAIL_CODE, LocalDateTime.now());
         tokensEmail.forEach(tokenRepository::delete);

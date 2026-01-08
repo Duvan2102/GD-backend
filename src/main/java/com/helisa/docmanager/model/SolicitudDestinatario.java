@@ -62,7 +62,6 @@ public class SolicitudDestinatario {
         PENDIENTE, APROBADO, RECHAZADO, CANCELADO
     }
 
-    // Métodos de utilidad
     public boolean estaPendiente() {
         return DecisionEnum.PENDIENTE.equals(this.decision);
     }

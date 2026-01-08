@@ -42,7 +42,6 @@ public class SolicitudAdjunto {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    // Métodos de utilidad
     public String getSizeFormatted() {
         if (sizeBytes < 1024) return sizeBytes + " B";
         if (sizeBytes < 1024 * 1024) return (sizeBytes / 1024) + " KB";
