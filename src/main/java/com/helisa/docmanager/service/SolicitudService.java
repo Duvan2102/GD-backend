@@ -721,6 +721,8 @@ public class SolicitudService {
                                 nombreSolicitante,
                                 true,
                                 true
+                                true,
+                                true
                         );
                         
                         log.info("Notificación enviada al primer aprobador (usuario {}) para solicitud {}",
@@ -738,6 +740,8 @@ public class SolicitudService {
                                 solicitud.getId(),
                                 solicitud.getNombreSolicitud(),
                                 nombreSolicitante,
+                                false,
+                                false
                                 false,
                                 false
                         );
@@ -791,6 +795,8 @@ public class SolicitudService {
                     solicitud.getId(),
                     solicitud.getNombreSolicitud(),
                     nombreSolicitante,
+                    true,
+                    true
                     true,
                     true
             );
@@ -1528,6 +1534,7 @@ public class SolicitudService {
             
             return textoTruncado + "...";
         } catch (Exception e) {
+            int maxChars = (int) (anchoMaximo / (fontSize * 0.6f));
             int maxChars = (int) (anchoMaximo / (fontSize * 0.6f));
             if (texto.length() > maxChars) {
                 return texto.substring(0, maxChars) + "...";

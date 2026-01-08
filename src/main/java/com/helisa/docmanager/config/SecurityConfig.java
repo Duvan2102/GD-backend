@@ -35,12 +35,8 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Permitir peticiones OPTIONS para CORS preflight
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         
-                        // IMPORTANTE: Las reglas específicas DEBEN ir ANTES que las generales
-                        
-                        // Endpoints públicos de autenticación (ORDEN ESPECÍFICO)
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/validate-2fa").permitAll()
@@ -51,23 +47,18 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/auth/password/*").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/logout").permitAll()
                         
-                        // Endpoints públicos de recuperación de contraseña
                         .requestMatchers(HttpMethod.POST, "/api/password-reset/request").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/password-reset/confirm").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/password-reset/validate-token").permitAll()
                         
-                        // Endpoints de administración específicos
                         .requestMatchers("/api/admin/**").authenticated()
                         .requestMatchers("/api/usuarios/pendientes").authenticated()
                         .requestMatchers("/api/usuarios/*/activar").authenticated()
                         .requestMatchers("/api/usuarios/*/rechazar").authenticated()
                         .requestMatchers("/api/usuarios/*/estado-pendiente").authenticated()
                         
-                        // REGLAS GENERALES AL FINAL (menor prioridad)
-                        // Todos los demás endpoints de auth requieren autenticación
                         .requestMatchers("/api/auth/**").authenticated()
                         
-                        // Todos los demás endpoints requieren autenticación
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
@@ -89,24 +80,16 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
-        // IMPORTANTE: En producción, reemplazar "*" con los dominios específicos de tu frontend
-        // Ejemplo: Arrays.asList("https://tu-dominio.com", "https://app.tu-dominio.com")
         configuration.setAllowedOriginPatterns(Arrays.asList("*"));
         
-        // Permitir todos los métodos HTTP
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         
-        // Permitir todos los headers para evitar problemas de CORS
-        // En producción puedes restringir a headers específicos
         configuration.setAllowedHeaders(Arrays.asList("*"));
         
-        // Permitir credenciales (cookies, authorization headers)
         configuration.setAllowCredentials(false);
         
-        // Exponer headers necesarios para el cliente
         configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Type", "Content-Disposition", "X-Correlation-Id"));
         
-        // Tiempo de caché para preflight requests (1 hora)
         configuration.setMaxAge(3600L);
         
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

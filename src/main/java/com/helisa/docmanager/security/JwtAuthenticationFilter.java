@@ -32,7 +32,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Autowired
     private RevokedTokenRepository revokedTokenRepository;
 
-    // Lista de endpoints públicos que no requieren autenticación
     private static final List<String> PUBLIC_ENDPOINTS = Arrays.asList(
         "/api/auth/login",
         "/api/auth/register", 
@@ -53,14 +52,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String requestPath = request.getRequestURI();
         String requestMethod = request.getMethod();
 
-        // Saltar el filtro para peticiones OPTIONS (preflight)
         if ("OPTIONS".equalsIgnoreCase(requestMethod)) {
             log.debug("Saltando filtro JWT para petición OPTIONS: {}", requestPath);
             filterChain.doFilter(request, response);
             return;
         }
 
-        // Saltar el filtro para endpoints públicos
         if (isPublicEndpoint(requestPath, requestMethod)) {
             log.debug("Saltando filtro JWT para endpoint público: {} {}", requestMethod, requestPath);
             filterChain.doFilter(request, response);
@@ -74,7 +71,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             jwt = authHeader.substring(7);
             try {
-                // Verificar si el token está expirado antes de procesarlo
                 if (jwtService.isTokenExpired(jwt)) {
                     log.warn("Token expirado recibido");
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
@@ -98,7 +94,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
-            // Verificar si el token está revocado
             try {
                 String jti = jwtService.extractJti(jwt);
                 if (revokedTokenRepository.existsByJti(jti)) {
@@ -139,13 +134,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    /**
-     * Verifica si un endpoint es público y no requiere autenticación
-     */
     private boolean isPublicEndpoint(String requestPath, String requestMethod) {
         for (String publicEndpoint : PUBLIC_ENDPOINTS) {
             if (requestPath.startsWith(publicEndpoint)) {
-                // Verificación adicional para endpoints específicos
                 if ("/api/auth/login".equals(publicEndpoint) && "POST".equals(requestMethod)) {
                     return true;
                 }

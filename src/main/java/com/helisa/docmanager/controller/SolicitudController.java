@@ -332,6 +332,7 @@ public class SolicitudController {
     @GetMapping("/historico")
     public ResponseEntity<Page<SolicitudResumenResponse>> listarHistorico(
             @RequestParam Integer usuarioId,
+            @RequestParam Integer usuarioId,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
             @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
 

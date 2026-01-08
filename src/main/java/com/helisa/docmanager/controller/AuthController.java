@@ -232,6 +232,7 @@ public class AuthController {
         private String usuario;
         private String password;
         private String codigo2FA;
+        private String codigo2FA;
     }
 
     @Data
@@ -347,6 +348,7 @@ public class AuthController {
         private final String message;
         private final String usuario;
         private final boolean requiere2FA;
+        private final String tempToken;
         private final String tempToken;
     }
 
