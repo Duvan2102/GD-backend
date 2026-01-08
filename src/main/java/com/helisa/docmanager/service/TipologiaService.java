@@ -30,7 +30,6 @@ public class TipologiaService {
             throw new RuntimeException("El cargo especificado no existe");
         }
 
-        // Validar que no exista una tipología con descripción similar en el mismo cargo (ignorando acentos y mayúsculas)
         String descripcionNormalizada = StringUtils.normalizeForComparison(tipologia.getDescripcion());
         List<Tipologia> tipologiasExistentes = tipologiaRepository.findByCargo(cargo.get());
         
@@ -98,7 +97,6 @@ public class TipologiaService {
                             throw new RuntimeException("El cargo especificado no existe");
                         }
 
-                        // Validar que no exista otra tipología con descripción similar en el mismo cargo (ignorando acentos y mayúsculas)
                         if (!StringUtils.equalsNormalized(tipologia.getDescripcion(), tipologiaActualizada.getDescripcion()) ||
                                 !tipologia.getCargo().getIdCargo().equals(tipologiaActualizada.getCargo().getIdCargo())) {
 

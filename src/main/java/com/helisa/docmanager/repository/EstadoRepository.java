@@ -11,7 +11,6 @@ public interface EstadoRepository extends JpaRepository<Estado, Integer> {
 
     Optional<Estado> findByDescripcion(String descripcion);
 
-    // Métodos de conveniencia para obtener estados específicos
     default Estado getEstadoPendiente() {
         return findById(1).orElseThrow(() ->
                 new IllegalStateException("Estado PENDIENTE no encontrado en BD"));

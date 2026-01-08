@@ -30,7 +30,6 @@ public class CargoService {
             throw new RuntimeException("El área especificada no existe");
         }
 
-        // Validar que no exista un cargo con descripción similar en la misma área (ignorando acentos y mayúsculas)
         String descripcionNormalizada = StringUtils.normalizeForComparison(cargo.getDescripcion());
         List<Cargo> cargosExistentes = cargoRepository.findByArea(area.get());
         
@@ -90,7 +89,6 @@ public class CargoService {
                             throw new RuntimeException("El área especificada no existe");
                         }
 
-                        // Validar que no exista otro cargo con descripción similar en la misma área (ignorando acentos y mayúsculas)
                         if (!StringUtils.equalsNormalized(cargo.getDescripcion(), cargoActualizado.getDescripcion()) ||
                                 !cargo.getArea().getIdArea().equals(cargoActualizado.getArea().getIdArea())) {
 

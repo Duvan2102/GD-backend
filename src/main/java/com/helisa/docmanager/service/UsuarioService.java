@@ -66,7 +66,6 @@ public class UsuarioService {
             throw new RuntimeException("Debe especificar un cargo válido");
         }
 
-        // Validar que se proporcionen vistas disponibles
         if (usuario.getRol() == null || usuario.getRol().isEmpty()) {
             throw new RuntimeException("Debe especificar al menos una vista disponible para el usuario");
         }
@@ -76,7 +75,6 @@ public class UsuarioService {
         }
         usuario.setPassword(passwordEncoder.encode(usuario.getPassword()));
 
-        // Establecer método 2FA predeterminado: Google Auth
         if (usuario.getTokenQr() == null) {
             usuario.setTokenQr(true);
         }
@@ -84,10 +82,8 @@ public class UsuarioService {
             usuario.setTokenCorreo(false);
         }
         
-        // Guardar el usuario primero para obtener el ID generado
         Usuario usuarioGuardado = usuarioRepository.save(usuario);
         
-        // Enviar correo de activación después de guardar el usuario
         if (usuarioGuardado.getCorreoEmpresarial() != null && !usuarioGuardado.getCorreoEmpresarial().trim().isEmpty()) {
             try {
                 String token = passwordResetService.generarTokenParaActivacion(usuarioGuardado.getIdUsuario());
@@ -198,7 +194,6 @@ public class UsuarioService {
             }
         }
 
-        // Actualizar vistas disponibles si se proporcionan
         if (usuarioActualizado.getRol() != null && !usuarioActualizado.getRol().isEmpty()) {
             usuario.setRol(usuarioActualizado.getRol());
         }
@@ -208,7 +203,6 @@ public class UsuarioService {
         usuario.setTelefono1(usuarioActualizado.getTelefono1());
         usuario.setTelefono2(usuarioActualizado.getTelefono2());
         usuario.setDireccion(usuarioActualizado.getDireccion());
-        // Actualizar método 2FA si se proporciona
         if (usuarioActualizado.getTokenQr() != null) {
             usuario.setTokenQr(usuarioActualizado.getTokenQr());
         }

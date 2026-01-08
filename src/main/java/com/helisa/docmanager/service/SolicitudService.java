@@ -110,7 +110,6 @@ public class SolicitudService {
                     request.getComentarioInicial() != null ?
                             request.getComentarioInicial() : "Solicitud creada");
 
-            // Enviar notificaciones a los aprobadores
             enviarNotificacionesNuevaSolicitud(solicitud);
 
             log.info("Solicitud creada exitosamente: {}", solicitud.getId());
@@ -236,7 +235,6 @@ public class SolicitudService {
         Solicitud solicitud = solicitudRepository.findById(solicitudId)
                 .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
 
-        // Verificar el estado de la solicitud y proporcionar mensajes descriptivos
         if (solicitud.estaAprobado()) {
             throw new IllegalStateException("La solicitud ya fue aprobada y no puede ser cancelada");
         }
@@ -253,7 +251,6 @@ public class SolicitudService {
             throw new IllegalStateException("La solicitud no está en estado PENDIENTE");
         }
 
-        // Verificar autorización
         boolean esCreador = solicitud.getIdSolicitante().equals(request.getUsuarioId());
         boolean esDestinatario = destinatarioRepository
                 .existsBySolicitudIdAndUsuarioId(solicitudId, request.getUsuarioId());
@@ -262,15 +259,10 @@ public class SolicitudService {
             throw new IllegalStateException("Usuario no autorizado para cancelar");
         }
 
-        // Cambiar estado a CANCELADA
         Estado estadoCancelado = estadoRepository.getEstadoCancelado();
         solicitud.setEstado(estadoCancelado);
         solicitudRepository.save(solicitud);
 
-        // NOTA: Los archivos NO se eliminan cuando se cancela una solicitud
-        // para mantener un historial completo de documentos
-
-        // Crear historial
         SolicitudHistorial historial = SolicitudHistorial.crear(
                 solicitud, request.getUsuarioId(),
                 SolicitudHistorial.AccionEnum.CANCELAR,
@@ -381,14 +373,12 @@ public class SolicitudService {
         log.info("Se agregaron {} procesador(es) a la solicitud {}", nuevosProcesadores.size(), solicitudId);
     }
 
-    // ================ MÉTODOS AUXILIARES ================
 
     @Transactional(readOnly = true)
     public Page<SolicitudResumenResponse> listarPorCreador(Integer creadorId, String estado, Pageable pageable) {
         Page<Solicitud> solicitudes;
 
         if (estado != null && !estado.trim().isEmpty()) {
-            // Buscar el estado en la BD
             Estado estadoEntity = estadoRepository.findByDescripcion(estado.toUpperCase())
                     .orElseThrow(() -> new IllegalArgumentException("Estado no válido: " + estado));
 
@@ -401,7 +391,6 @@ public class SolicitudService {
         return solicitudes.map(this::mapearAResumen);
     }
 
-    // ================ MÉTODOS DE MAPEO ================
 
     private SolicitudDetalleResponse mapearADetalle(Solicitud solicitud) {
         List<AdjuntoResponse> adjuntos = adjuntoRepository.findBySolicitudId(solicitud.getId())
@@ -449,7 +438,6 @@ public class SolicitudService {
         Long aprobados = destinatarioRepository.countAprobadosBySolicitudId(solicitud.getId(), esProcesador);
         Long total = destinatarioRepository.countTotalBySolicitudId(solicitud.getId(), esProcesador);
 
-        // Obtener información de la tipología
         String descripcionTipologia = null;
         Boolean requiereProceso = null;
         if (solicitud.getTipologia() != null) {
@@ -481,7 +469,6 @@ public class SolicitudService {
     }
 
     private SolicitudResumenResponse mapearAResumen(Solicitud s) {
-        // ---- Preload de usuarios (solicitante + destinatarios) en 1 query ----
         Set<Integer> ids = new HashSet<>();
         if (s.getIdSolicitante() != null) ids.add(s.getIdSolicitante());
         if (s.getDestinatariosDetalle() != null) {
@@ -495,7 +482,6 @@ public class SolicitudService {
                 : usuarioRepository.findByIdUsuarioIn(ids).stream()
                 .collect(Collectors.toMap(Usuario::getIdUsuario, Function.identity()));
 
-        // ---- Solicitante (nombre/cargo si lo necesitas) ----
         Usuario solicitante = usuarios.get(s.getIdSolicitante());
         String solicitanteNombre = (solicitante == null) ? null :
                 Stream.of(solicitante.getNombres(), solicitante.getApellidos())
@@ -561,13 +547,6 @@ public class SolicitudService {
                 .destinatariosAprobados(aprobados)
                 .build();
     }
-
-
-
-
-
-
-
 
     private void validarPdfPrincipal(MultipartFile pdf) {
         if (pdf == null || pdf.isEmpty()) {
@@ -696,10 +675,6 @@ public class SolicitudService {
         historialRepository.save(historial);
     }
 
-    /**
-     * Envía notificaciones por correo a los aprobadores cuando se crea una nueva solicitud
-     * @param solicitud La solicitud recién creada
-     */
     private void enviarNotificacionesNuevaSolicitud(Solicitud solicitud) {
         try {
             List<SolicitudDestinatario> destinatarios = destinatarioRepository
@@ -710,7 +685,6 @@ public class SolicitudService {
                 return;
             }
 
-            // Obtener información del solicitante
             Usuario solicitante = usuarioRepository.findById(solicitud.getIdSolicitante()).orElse(null);
             String nombreSolicitante = solicitante != null ? 
                     Stream.of(solicitante.getNombres(), solicitante.getApellidos())
@@ -719,7 +693,6 @@ public class SolicitudService {
                             .filter(str -> !str.isEmpty())
                             .collect(Collectors.joining(" ")) : "Usuario";
 
-            // Obtener información de todos los destinatarios
             List<Integer> idsDestinatarios = destinatarios.stream()
                     .map(SolicitudDestinatario::getUsuarioId)
                     .distinct()
@@ -732,7 +705,6 @@ public class SolicitudService {
             boolean esOrdenSecuencial = Boolean.TRUE.equals(solicitud.getOrdenFirmaBoolean());
 
             if (esOrdenSecuencial) {
-                // Para orden secuencial, solo notificar al primer aprobador
                 SolicitudDestinatario primerAprobador = destinatarios.stream()
                         .min(Comparator.comparing(SolicitudDestinatario::getOrdenIndex))
                         .orElse(null);
@@ -747,8 +719,8 @@ public class SolicitudService {
                                 solicitud.getId(),
                                 solicitud.getNombreSolicitud(),
                                 nombreSolicitante,
-                                true, // esOrdenSecuencial
-                                true  // esSiguienteAprobador
+                                true,
+                                true
                         );
                         
                         log.info("Notificación enviada al primer aprobador (usuario {}) para solicitud {}",
@@ -756,7 +728,6 @@ public class SolicitudService {
                     }
                 }
             } else {
-                // Para aprobación simultánea, notificar a todos los destinatarios
                 for (SolicitudDestinatario destinatario : destinatarios) {
                     Usuario usuario = usuariosDestinatarios.get(destinatario.getUsuarioId());
                     if (usuario != null && usuario.getCorreoEmpresarial() != null && 
@@ -767,8 +738,8 @@ public class SolicitudService {
                                 solicitud.getId(),
                                 solicitud.getNombreSolicitud(),
                                 nombreSolicitante,
-                                false, // esOrdenSecuencial
-                                false  // esSiguienteAprobador
+                                false,
+                                false
                         );
                     }
                 }
@@ -780,18 +751,11 @@ public class SolicitudService {
         } catch (Exception e) {
             log.error("Error al enviar notificaciones de nueva solicitud {}: {}", 
                     solicitud.getId(), e.getMessage(), e);
-            // No lanzar excepción para evitar que falle la creación de la solicitud
         }
     }
 
-    /**
-     * Notifica al siguiente aprobador en la cola cuando una solicitud con orden secuencial
-     * es aprobada por un aprobador anterior
-     * @param solicitud La solicitud que fue aprobada parcialmente
-     */
     private void notificarSiguienteAprobador(Solicitud solicitud) {
         try {
-            // Obtener el siguiente aprobador usando FlujoAprobacionService
             SolicitudDestinatario siguienteAprobador = flujoService.obtenerSiguienteAprobador(solicitud.getId());
             
             if (siguienteAprobador == null) {
@@ -799,7 +763,6 @@ public class SolicitudService {
                 return;
             }
 
-            // Obtener información del usuario siguiente aprobador
             Usuario usuarioAprobador = usuarioRepository.findById(siguienteAprobador.getUsuarioId()).orElse(null);
             
             if (usuarioAprobador == null) {
@@ -815,7 +778,6 @@ public class SolicitudService {
                 return;
             }
 
-            // Obtener información del solicitante
             Usuario solicitante = usuarioRepository.findById(solicitud.getIdSolicitante()).orElse(null);
             String nombreSolicitante = solicitante != null ? 
                     Stream.of(solicitante.getNombres(), solicitante.getApellidos())
@@ -824,14 +786,13 @@ public class SolicitudService {
                             .filter(str -> !str.isEmpty())
                             .collect(Collectors.joining(" ")) : "Usuario";
 
-            // Enviar notificación al siguiente aprobador
             emailService.enviarNotificacionNuevaSolicitud(
                     usuarioAprobador.getCorreoEmpresarial(),
                     solicitud.getId(),
                     solicitud.getNombreSolicitud(),
                     nombreSolicitante,
-                    true, // esOrdenSecuencial
-                    true  // esSiguienteAprobador
+                    true,
+                    true
             );
 
             log.info("Notificación enviada al siguiente aprobador (usuario {}) para solicitud {}",
@@ -893,11 +854,6 @@ public class SolicitudService {
         }
     }
 
-    /**
-     * Envía notificaciones por correo a los nuevos procesadores agregados a una solicitud
-     * @param solicitud La solicitud a la que se agregaron procesadores
-     * @param nuevosProcesadores Lista de los nuevos procesadores agregados
-     */
     private void enviarNotificacionesNuevosProcesadores(Solicitud solicitud, 
                                                          List<SolicitudDestinatario> nuevosProcesadores) {
         try {
@@ -906,7 +862,6 @@ public class SolicitudService {
                 return;
             }
 
-            // Obtener información del solicitante
             Usuario solicitante = usuarioRepository.findById(solicitud.getIdSolicitante()).orElse(null);
             String nombreSolicitante = solicitante != null ? 
                     Stream.of(solicitante.getNombres(), solicitante.getApellidos())
@@ -915,7 +870,6 @@ public class SolicitudService {
                             .filter(str -> !str.isEmpty())
                             .collect(Collectors.joining(" ")) : "Usuario";
 
-            // Obtener información de los nuevos procesadores
             List<Integer> idsProcesadores = nuevosProcesadores.stream()
                     .map(SolicitudDestinatario::getUsuarioId)
                     .distinct()
@@ -927,7 +881,6 @@ public class SolicitudService {
 
             boolean esOrdenSecuencial = Boolean.TRUE.equals(solicitud.getOrdenFirmaBoolean());
 
-            // Notificar a todos los nuevos procesadores
             for (SolicitudDestinatario procesador : nuevosProcesadores) {
                 Usuario usuario = usuariosProcesadores.get(procesador.getUsuarioId());
                 if (usuario != null && usuario.getCorreoEmpresarial() != null && 
@@ -961,7 +914,6 @@ public class SolicitudService {
         } catch (Exception e) {
             log.error("Error al enviar notificaciones a nuevos procesadores para solicitud {}: {}", 
                     solicitud.getId(), e.getMessage(), e);
-            // No lanzar excepción para evitar que falle la adición de procesadores
         }
     }
 
@@ -1010,10 +962,6 @@ public class SolicitudService {
         return mapearADetalle(solicitud);
     }
 
-
-
-
-
     @Transactional(readOnly = true)
     public Page<SolicitudResumenResponse> listarHistorico(Integer usuarioId, Pageable pageable) {
         Page<Solicitud> solicitudes = solicitudRepository.findHistoricoUsuario(usuarioId, pageable);
@@ -1028,29 +976,23 @@ public class SolicitudService {
 
     @Transactional(readOnly = true)
     public Page<SolicitudResumenResponse> listarPorArea(Integer usuarioId, Pageable pageable) {
-        // Obtener el usuario
         Usuario usuario = usuarioRepository.findById(usuarioId)
                 .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado con id: " + usuarioId));
         
-        // Verificar que el usuario tenga cargo
         if (usuario.getCargo() == null || usuario.getCargo().getIdCargo() == null) {
             throw new RuntimeException("El usuario no tiene un cargo asignado");
         }
         
-        // Obtener todas las tipologías asociadas al cargo del usuario
         List<Tipologia> tipologias = tipologiaRepository.findByCargoIdCargo(usuario.getCargo().getIdCargo());
         
-        // Si no hay tipologías, retornar página vacía
         if (tipologias.isEmpty()) {
             return Page.empty(pageable);
         }
         
-        // Extraer los IDs de las tipologías
         List<Integer> tipologiaIds = tipologias.stream()
                 .map(Tipologia::getIdTipologia)
                 .collect(Collectors.toList());
         
-        // Buscar solicitudes que tengan alguna de estas tipologías
         Page<Solicitud> solicitudes = solicitudRepository.findByIdTipologiaIn(tipologiaIds, pageable);
         return solicitudes.map(this::mapearAResumen);
     }
@@ -1124,7 +1066,6 @@ public class SolicitudService {
     }
 
 
-    // Genera un ZIP con: PDF principal, adjuntos y un PDF con tabla de log (nombre/acción/fecha)
     @Transactional(readOnly = true)
     public InputStream descargarTodoComoZip(Integer solicitudId) throws Exception {
         Solicitud solicitud = solicitudRepository.findById(solicitudId)
@@ -1134,27 +1075,22 @@ public class SolicitudService {
         List<SolicitudHistorial> historial = historialRepository.findBySolicitudIdOrderByFechaAscWithUsuario(solicitudId.longValue());
         List<SolicitudDestinatario> destinatarios = destinatarioRepository.findBySolicitudId(solicitudId);
 
-        // Generar PDF de log en memoria
         byte[] pdfLog = generarPdfLog(historial, destinatarios, solicitud);
 
-        // Crear ZIP en memoria
         java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
         try (java.util.zip.ZipOutputStream zos = new java.util.zip.ZipOutputStream(baos)) {
             
-            // PDF principal - verificar existencia antes de agregar
             if (solicitud.getPdfPath() != null && archivoExiste(solicitud.getPdfPath())) {
                 try (InputStream pdfPrincipal = storageService.leerArchivo(solicitud.getPdfPath())) {
                     agregarEntradaZip(zos, "principal/" + solicitud.getPdfOriginalName(), pdfPrincipal);
                 }
             } else {
                 log.warn("PDF principal no encontrado para solicitud {}: {}", solicitudId, solicitud.getPdfPath());
-                // Agregar archivo de notificación en lugar del PDF faltante
                 String mensaje = "PDF principal no disponible: " + solicitud.getPdfPath();
                 agregarEntradaZip(zos, "principal/ARCHIVO_NO_ENCONTRADO.txt", 
                     new java.io.ByteArrayInputStream(mensaje.getBytes()));
             }
 
-            // Adjuntos - verificar existencia antes de agregar
             for (SolicitudAdjunto adj : adjuntos) {
                 if (archivoExiste(adj.getPath())) {
                     try (InputStream is = storageService.leerArchivo(adj.getPath())) {
@@ -1162,14 +1098,12 @@ public class SolicitudService {
                     }
                 } else {
                     log.warn("Adjunto no encontrado para solicitud {}: {}", solicitudId, adj.getPath());
-                    // Agregar archivo de notificación en lugar del adjunto faltante
                     String mensaje = "Adjunto no disponible: " + adj.getOriginalName() + " (" + adj.getPath() + ")";
                     agregarEntradaZip(zos, "adjuntos/" + adj.getOriginalName() + ".NO_ENCONTRADO.txt", 
                         new java.io.ByteArrayInputStream(mensaje.getBytes()));
                 }
             }
 
-            // PDF de log
             agregarEntradaZip(zos, "log/log-solicitud-" + solicitudId + ".pdf", new java.io.ByteArrayInputStream(pdfLog));
         }
 
@@ -1193,7 +1127,6 @@ public class SolicitudService {
         }
     }
 
-    // Genera PDF con tabla formateada (nombre/accion/fecha/descripcion) y sección de destinatarios
     private byte[] generarPdfLog(List<SolicitudHistorial> historial, List<SolicitudDestinatario> destinatarios, Solicitud solicitud) throws Exception {
         PDDocument doc = new PDDocument();
         PDPage page = new PDPage();
@@ -1208,7 +1141,6 @@ public class SolicitudService {
         float leading = 16f;
         float anchoPagina = page.getMediaBox().getWidth() - (margin * 2);
         
-        // Anchos de columna (en puntos)
         float anchoNombre = 100f;
         float anchoAccion = 100f;
         float anchoFecha = 95f;
@@ -1236,7 +1168,6 @@ public class SolicitudService {
         cs.endText();
         yStart -= leading * 2;
 
-        // Encabezados de la tabla
         cs.beginText();
         cs.setFont(fontBold, 10);
         cs.newLineAtOffset(margin, yStart);
@@ -1250,7 +1181,6 @@ public class SolicitudService {
         cs.endText();
         yStart -= leading;
 
-        // Línea separadora debajo de encabezados
         cs.setLineWidth(1f);
         cs.moveTo(margin, yStart);
         cs.lineTo(margin + anchoPagina, yStart);
@@ -1259,7 +1189,6 @@ public class SolicitudService {
 
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-        // Datos de la tabla
         cs.setFont(font, 9);
         for (SolicitudHistorial h : historial) {
             String nombre = h.getNombreUsuario() != null ? limpiarTexto(h.getNombreUsuario()) : "Sistema";
@@ -1267,10 +1196,8 @@ public class SolicitudService {
             String comentario = h.getComentario() != null ? limpiarTexto(h.getComentario()) : "";
             String fecha = h.getFecha() != null ? h.getFecha().format(fmt) : "";
             
-            // Dividir descripción en múltiples líneas si es necesario
             List<String> lineasDescripcion = dividirTextoEnLineas(comentario, anchoDescripcion, font, 9);
             
-            // Salto de página si es necesario (considerando las líneas adicionales de descripción)
             float alturaNecesaria = leading * lineasDescripcion.size();
             if (yStart - alturaNecesaria < margin) {
                 cs.endText();
@@ -1282,39 +1209,31 @@ public class SolicitudService {
                 cs.setFont(font, 9);
             }
             
-            // Dibujar las tres primeras columnas en cada línea de descripción
             for (int i = 0; i < lineasDescripcion.size(); i++) {
                 cs.beginText();
                 cs.newLineAtOffset(margin, yStart);
                 
-                // Columna 1: Nombre (solo en la primera línea)
                 if (i == 0) {
                     String nombreTruncado = truncarTexto(nombre, anchoNombre, font, 9);
                     cs.showText(nombreTruncado);
                 }
                 
-                // Avanzar a la columna de acción
                 cs.newLineAtOffset(i == 0 ? anchoNombre : 0, 0);
                 
-                // Columna 2: Acción (solo en la primera línea)
                 if (i == 0) {
                     String accionTruncada = truncarTexto(accion, anchoAccion, font, 9);
                     cs.showText(accionTruncada);
                 }
                 
-                // Avanzar a la columna de fecha
                 cs.newLineAtOffset(i == 0 ? anchoAccion : 0, 0);
                 
-                // Columna 3: Fecha (solo en la primera línea)
                 if (i == 0) {
                     String fechaTruncada = truncarTexto(fecha, anchoFecha, font, 9);
                     cs.showText(fechaTruncada);
                 }
                 
-                // Avanzar a la columna de descripción
                 cs.newLineAtOffset(i == 0 ? anchoFecha : anchoNombre + anchoAccion + anchoFecha, 0);
                 
-                // Columna 4: Descripción (puede tener múltiples líneas)
                 cs.showText(lineasDescripcion.get(i));
                 
                 cs.endText();
@@ -1572,32 +1491,21 @@ public class SolicitudService {
         return baos.toByteArray();
     }
 
-    /**
-     * Limpia el texto eliminando caracteres de control y caracteres especiales
-     * que no son compatibles con la codificación WinAnsiEncoding de PDFBox
-     */
     private String limpiarTexto(String texto) {
         if (texto == null) {
             return "";
         }
-        // Reemplazar saltos de línea y retornos de carro por espacios
         texto = texto.replace('\r', ' ');
         texto = texto.replace('\n', ' ');
         texto = texto.replace('\t', ' ');
         
-        // Eliminar cualquier otro carácter de control (caracteres fuera del rango ASCII 32-126)
         texto = texto.replaceAll("[\\x00-\\x1F]", " ");
         
-        // Normalizar espacios múltiples a uno solo
         texto = texto.replaceAll("\\s+", " ");
         
         return texto.trim();
     }
 
-    /**
-     * Trunca el texto si excede el ancho máximo permitido en puntos
-     * Usa "..." al final si el texto fue truncado
-     */
     private String truncarTexto(String texto, float anchoMaximo, org.apache.pdfbox.pdmodel.font.PDFont font, float fontSize) {
         if (texto == null || texto.isEmpty()) {
             return "";
@@ -1610,7 +1518,6 @@ public class SolicitudService {
                 return texto;
             }
             
-            // Buscar el punto de corte usando búsqueda binaria
             int longitud = texto.length();
             String textoTruncado = texto;
             
@@ -1621,8 +1528,7 @@ public class SolicitudService {
             
             return textoTruncado + "...";
         } catch (Exception e) {
-            // Si hay error calculando el ancho, simplemente truncar por caracteres
-            int maxChars = (int) (anchoMaximo / (fontSize * 0.6f)); // Aproximación
+            int maxChars = (int) (anchoMaximo / (fontSize * 0.6f));
             if (texto.length() > maxChars) {
                 return texto.substring(0, maxChars) + "...";
             }
@@ -1630,10 +1536,6 @@ public class SolicitudService {
         }
     }
 
-    /**
-     * Divide un texto en múltiples líneas según el ancho máximo disponible
-     * Cada línea cabrá dentro del ancho especificado
-     */
     private List<String> dividirTextoEnLineas(String texto, float anchoMaximo, org.apache.pdfbox.pdmodel.font.PDFont font, float fontSize) {
         List<String> lineas = new ArrayList<>();
         
@@ -1656,12 +1558,10 @@ public class SolicitudService {
                     }
                     lineaActual.append(palabra);
                 } else {
-                    // La palabra no cabe, empezar nueva línea
                     if (lineaActual.length() > 0) {
                         lineas.add(lineaActual.toString());
                         lineaActual = new StringBuilder();
                     }
-                    // Si la palabra sola es demasiado larga, truncarla
                     if (font.getStringWidth(palabra) / 1000 * fontSize > anchoMaximo) {
                         palabra = truncarTexto(palabra, anchoMaximo, font, fontSize).replace("...", "");
                     }
@@ -1669,7 +1569,6 @@ public class SolicitudService {
                 }
             }
             
-            // Agregar la última línea
             if (lineaActual.length() > 0) {
                 lineas.add(lineaActual.toString());
             } else if (lineas.isEmpty()) {
@@ -1677,7 +1576,6 @@ public class SolicitudService {
             }
             
         } catch (Exception e) {
-            // Fallback: dividir por caracteres
             int maxChars = (int) (anchoMaximo / (fontSize * 0.6f));
             while (texto.length() > maxChars) {
                 lineas.add(texto.substring(0, maxChars));

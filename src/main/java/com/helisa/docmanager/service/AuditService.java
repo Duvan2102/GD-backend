@@ -47,35 +47,25 @@ public class AuditService {
     @Autowired
     private DepartamentoRepository departamentoRepository;
 
-    /**
-     * Busca solicitudes con filtros de auditoría
-     */
     @Transactional(readOnly = true)
     public Page<AuditSolicitudResponse> buscarSolicitudesAuditoria(AuditSearchRequest request, Pageable pageable) {
         log.info("Buscando solicitudes de auditoría con filtros: {}", request);
         
-        // Validar que al menos un filtro esté presente
         validateFilters(request.getFilters());
         
-        // Construir query dinámico basado en los filtros
         Page<Solicitud> solicitudes = buildAuditQuery(request.getFilters(), pageable);
         
         return solicitudes.map(this::mapearAAuditResponse);
     }
 
-    /**
-     * Genera Excel de auditoría para las solicitudes seleccionadas
-     */
     @Transactional(readOnly = true)
     public byte[] generarExcelAuditoria(AuditExcelRequest request) {
         log.info("Generando Excel de auditoría para {} solicitudes", request.getSelectedIds().size());
         
-        // Convertir IDs de String a Integer
         List<Integer> solicitudIds = request.getSelectedIds().stream()
                 .map(Integer::parseInt)
                 .collect(Collectors.toList());
         
-        // Obtener solicitudes con toda la información necesaria
         List<Solicitud> solicitudes = solicitudRepository.findAllById(solicitudIds);
         
         if (solicitudes.isEmpty()) {
@@ -115,8 +105,6 @@ public class AuditService {
     }
 
     private Page<Solicitud> buildAuditQuery(AuditSearchRequest.Filters filters, Pageable pageable) {
-        // Esta es una implementación simplificada. En un caso real, usarías Criteria API o QueryDSL
-        // para construir queries dinámicas más eficientes
         
         if (filters.getFechas() != null && 
             (filters.getFechas().getFechaDesde() != null || filters.getFechas().getFechaHasta() != null)) {
@@ -135,28 +123,23 @@ public class AuditService {
             }
         }
         
-        // Si no hay filtro de fechas, buscar por otros criterios
         if (filters.getEstado() != null && !filters.getEstado().trim().isEmpty()) {
             Estado estado = estadoRepository.findByDescripcion(filters.getEstado().toUpperCase())
                     .orElseThrow(() -> new IllegalArgumentException("Estado no válido: " + filters.getEstado()));
             return solicitudRepository.findByEstado(estado, pageable);
         }
         
-        // Por defecto, retornar todas las solicitudes (esto se puede mejorar con más filtros)
         return solicitudRepository.findAll(pageable);
     }
 
     private AuditSolicitudResponse mapearAAuditResponse(Solicitud solicitud) {
-        // Obtener información del solicitante
         Usuario solicitante = usuarioRepository.findById(solicitud.getIdSolicitante()).orElse(null);
         String solicitanteNombre = obtenerNombreCompleto(solicitante);
         String solicitanteCargo = obtenerCargo(solicitante);
         String departamento = obtenerDepartamento(solicitante);
         
-        // Obtener tipología
         String tipologia = obtenerTipologia(solicitud.getIdTipologia());
         
-        // Obtener destinatarios
         List<DestinatarioResponse> destinatarios = destinatarioRepository
                 .findBySolicitudId(solicitud.getId())
                 .stream()
@@ -175,7 +158,6 @@ public class AuditService {
                 })
                 .collect(Collectors.toList());
         
-        // Obtener lista de usuarios destinatarios como string
         String destinatariosLista = destinatarios.stream()
                 .map(dest -> {
                     Usuario usuario = usuarioRepository.findById(dest.getUsuarioId()).orElse(null);
@@ -183,7 +165,6 @@ public class AuditService {
                 })
                 .collect(Collectors.joining(", "));
         
-        // Obtener historial
         List<HistorialResponse> historial = historialRepository
                 .findBySolicitudIdOrderByFechaAscWithUsuario(solicitud.getId().longValue())
                 .stream()
@@ -262,39 +243,31 @@ public class AuditService {
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("Auditoría de Solicitudes");
             
-            // Crear estilos
             CellStyle headerStyle = crearEstiloEncabezado(workbook);
             CellStyle dataStyle = crearEstiloDatos(workbook);
             CellStyle dateStyle = crearEstiloFecha(workbook);
             
             int rowNum = 0;
             
-            // Encabezados principales
             Row headerRow = sheet.createRow(rowNum++);
             crearEncabezados(headerRow, headerStyle);
             
-            // Datos de solicitudes
             for (Solicitud solicitud : solicitudes) {
                 AuditSolicitudResponse auditResponse = mapearAAuditResponse(solicitud);
                 
-                // Fila principal de la solicitud
                 Row solicitudRow = sheet.createRow(rowNum++);
                 crearFilaSolicitud(solicitudRow, auditResponse, dataStyle, dateStyle);
                 
-                // Filas de historial
                 for (HistorialResponse historial : auditResponse.getHistorial()) {
                     Row historialRow = sheet.createRow(rowNum++);
                     crearFilaHistorial(historialRow, historial, dataStyle, dateStyle);
                 }
                 
-                // Fila vacía para separar solicitudes
                 rowNum++;
             }
             
-            // Ajustar ancho de columnas
             ajustarAnchoColumnas(sheet);
             
-            // Convertir a bytes
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
             workbook.write(outputStream);
             return outputStream.toByteArray();
@@ -354,7 +327,6 @@ public class AuditService {
     private void crearFilaSolicitud(Row row, AuditSolicitudResponse audit, CellStyle dataStyle, CellStyle dateStyle) {
         int col = 0;
         
-        // Datos principales de la solicitud
         crearCelda(row, col++, audit.getId().toString(), dataStyle);
         crearCelda(row, col++, audit.getNombreSolicitud(), dataStyle);
         crearCelda(row, col++, audit.getEstado(), dataStyle);
@@ -370,7 +342,6 @@ public class AuditService {
         crearCelda(row, col++, audit.getPdfOriginalName(), dataStyle);
         crearCelda(row, col++, audit.getPdfSizeBytes().toString(), dataStyle);
         
-        // Campos para historial (se llenarán en las filas de historial)
         crearCelda(row, col++, "SOLICITUD", dataStyle);
         crearCelda(row, col++, "", dataStyle);
         crearCelda(row, col++, "", dataStyle);
@@ -381,12 +352,10 @@ public class AuditService {
     private void crearFilaHistorial(Row row, HistorialResponse historial, CellStyle dataStyle, CellStyle dateStyle) {
         int col = 0;
         
-        // Campos vacíos para alineación con la fila de solicitud
         for (int i = 0; i < 14; i++) {
             crearCelda(row, col++, "", dataStyle);
         }
         
-        // Datos del historial
         crearCelda(row, col++, "HISTORIAL", dataStyle);
         crearCelda(row, col++, historial.getNombreUsuario(), dataStyle);
         crearCelda(row, col++, historial.getAccion(), dataStyle);
@@ -409,10 +378,8 @@ public class AuditService {
     }
 
     private void ajustarAnchoColumnas(Sheet sheet) {
-        // Ajustar ancho de columnas automáticamente
         for (int i = 0; i < 19; i++) {
             sheet.autoSizeColumn(i);
-            // Limitar el ancho máximo
             int currentWidth = sheet.getColumnWidth(i);
             if (currentWidth > 15000) {
                 sheet.setColumnWidth(i, 15000);

@@ -26,7 +26,6 @@ public class SolicitudHistorial {
     @Column(name = "actor_usuario_id")
     private Integer actorUsuarioId;
 
-    // Relación JPA para obtener el usuario completo (incluyendo nombre)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "actor_usuario_id", insertable = false, updatable = false)
     private Usuario actorUsuario;
@@ -70,7 +69,6 @@ public class SolicitudHistorial {
         return crear(solicitud, usuarioId, AccionEnum.RECHAZAR, comentario);
     }
 
-    // Métodos de utilidad para obtener información del usuario
     public String getNombreUsuario() {
         return actorUsuario != null ? actorUsuario.getUsuario() : "Usuario " + actorUsuarioId;
     }

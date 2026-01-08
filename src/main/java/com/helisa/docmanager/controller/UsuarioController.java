@@ -51,15 +51,12 @@ public class UsuarioController {
             @RequestParam(defaultValue = "idUsuario") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDir) {
         try {
-            // Crear objeto de ordenamiento
             Sort sort = sortDir.equalsIgnoreCase("desc") ? 
                 Sort.by(sortBy).descending() : 
                 Sort.by(sortBy).ascending();
             
-            // Crear objeto de paginación
             Pageable pageable = PageRequest.of(page, size, sort);
             
-            // Obtener usuarios paginados
             Page<Usuario> usuariosPage = usuarioService.obtenerTodosUsuarios(pageable);
             
             return ResponseEntity.ok(usuariosPage);

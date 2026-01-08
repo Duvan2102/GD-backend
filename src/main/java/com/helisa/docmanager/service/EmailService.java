@@ -102,7 +102,6 @@ public class EmailService {
  
     @Deprecated
     public void enviarCorreoActivacion(Usuario usuario) {
-        // Mantener compatibilidad pero redirigir al método nuevo
         enviarCorreoActivacionConToken(usuario, generarTokenRestablecimiento(usuario));
     }
 
@@ -212,7 +211,6 @@ public class EmailService {
 
 
     private String generarTokenRestablecimiento(Usuario usuario) {
-        // Generar un token simple basado en el ID del usuario y timestamp
         long timestamp = System.currentTimeMillis();
         return String.format("%d_%d", usuario.getIdUsuario(), timestamp);
     }
